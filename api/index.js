@@ -21,8 +21,10 @@ const r = express.Router();
 
 /* ---------------------------------------------------------------- helpers */
 
+// Campo ausente ou vazio devolve o valor de reserva, nunca zero.
 const num = (v, fallback = 0) => {
-  const n = Number(String(v ?? '').replace(',', '.'));
+  if (v === null || v === undefined || v === '') return fallback;
+  const n = Number(String(v).replace(',', '.'));
   return Number.isFinite(n) ? n : fallback;
 };
 const round = (n, d = 1) => Math.round(n * 10 ** d) / 10 ** d;
@@ -73,6 +75,7 @@ function publicUser(u) {
       protein: Number(u.target_protein),
       carbs: Number(u.target_carbs),
       fat: Number(u.target_fat),
+      fiber: Number(u.target_fiber),
       water: Number(u.target_water),
     },
   };
@@ -133,19 +136,24 @@ r.put(
   auth,
   go(async (req, res) => {
     const b = req.body || {};
+    const [atual] = await sql`select * from users where id = ${req.uid}`;
+    if (!atual) return res.status(401).json({ error: 'Conta não encontrada.' });
+    const t = b.targets || {};
+
     const [user] = await sql`
       update users set
-        name           = ${String(b.name || '').trim() || 'Você'},
-        sex            = ${b.sex === 'm' ? 'm' : 'f'},
-        birth_year     = ${b.birthYear ? Math.trunc(num(b.birthYear)) : null},
-        height_cm      = ${b.heightCm ? num(b.heightCm) : null},
-        activity       = ${String(b.activity || 'moderada')},
-        goal           = ${String(b.goal || 'manter')},
-        target_kcal    = ${Math.max(1000, Math.trunc(num(b.targets?.kcal, 2000)))},
-        target_protein = ${Math.max(0, Math.trunc(num(b.targets?.protein, 110)))},
-        target_carbs   = ${Math.max(0, Math.trunc(num(b.targets?.carbs, 230)))},
-        target_fat     = ${Math.max(0, Math.trunc(num(b.targets?.fat, 65)))},
-        target_water   = ${Math.max(0, Math.trunc(num(b.targets?.water, 2000)))}
+        name           = ${String(b.name || '').trim() || atual.name},
+        sex            = ${b.sex === 'm' || b.sex === 'f' ? b.sex : atual.sex},
+        birth_year     = ${b.birthYear ? Math.trunc(num(b.birthYear)) : atual.birth_year},
+        height_cm      = ${b.heightCm ? num(b.heightCm) : atual.height_cm},
+        activity       = ${String(b.activity || atual.activity)},
+        goal           = ${String(b.goal || atual.goal)},
+        target_kcal    = ${Math.max(1000, Math.trunc(num(t.kcal, atual.target_kcal)))},
+        target_protein = ${Math.max(0, Math.trunc(num(t.protein, atual.target_protein)))},
+        target_carbs   = ${Math.max(0, Math.trunc(num(t.carbs, atual.target_carbs)))},
+        target_fat     = ${Math.max(0, Math.trunc(num(t.fat, atual.target_fat)))},
+        target_fiber   = ${Math.max(0, Math.trunc(num(t.fiber, atual.target_fiber)))},
+        target_water   = ${Math.max(0, Math.trunc(num(t.water, atual.target_water)))}
       where id = ${req.uid}
       returning *`;
     res.json({ user: publicUser(user) });
@@ -299,8 +307,8 @@ r.get(
     const dow = weekdayOf(date);
 
     const [entries, habits, done, water, weight, note] = await Promise.all([
-      sql`select id, meal, quantity, name, unit,
-                 kcal::float8, protein::float8, carbs::float8, fat::float8, food_id
+      sql`select id, meal, quantity, name, unit, kcal::float8, protein::float8,
+                 carbs::float8, fat::float8, fiber::float8, food_id
           from entries where user_id = ${req.uid} and date = ${date} order by id`,
       sql`select * from habits where user_id = ${req.uid} and archived = false order by position, id`,
       sql`select habit_id from habit_logs where user_id = ${req.uid} and date = ${date}`,
@@ -316,8 +324,9 @@ r.get(
         protein: acc.protein + e.protein,
         carbs: acc.carbs + e.carbs,
         fat: acc.fat + e.fat,
+        fiber: acc.fiber + e.fiber,
       }),
-      { kcal: 0, protein: 0, carbs: 0, fat: 0 }
+      { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 }
     );
 
     res.json({
@@ -333,12 +342,14 @@ r.get(
         protein: round(e.protein),
         carbs: round(e.carbs),
         fat: round(e.fat),
+        fiber: round(e.fiber),
       })),
       totals: {
         kcal: Math.round(totals.kcal),
         protein: round(totals.protein),
         carbs: round(totals.carbs),
         fat: round(totals.fat),
+        fiber: round(totals.fiber),
       },
       habits: habits
         .filter((h) => h.weekdays.includes(String(dow)))
@@ -365,10 +376,10 @@ r.post(
 
     const f = quantity / Number(food.base_qty);
     const [e] = await sql`
-      insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat)
+      insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber)
       values (${req.uid}, ${food.id}, ${date}, ${meal}, ${quantity}, ${food.name}, ${food.unit},
               ${Number(food.kcal) * f}, ${Number(food.protein) * f},
-              ${Number(food.carbs) * f}, ${Number(food.fat) * f})
+              ${Number(food.carbs) * f}, ${Number(food.fat) * f}, ${Number(food.fiber) * f})
       returning id`;
     res.status(201).json({ id: e.id });
   })
@@ -395,6 +406,7 @@ r.put(
           protein: Number(food.protein),
           carbs: Number(food.carbs),
           fat: Number(food.fat),
+          fiber: Number(food.fiber),
         }
       : {
           per: Number(entry.quantity),
@@ -402,13 +414,14 @@ r.put(
           protein: Number(entry.protein),
           carbs: Number(entry.carbs),
           fat: Number(entry.fat),
+          fiber: Number(entry.fiber),
         };
     const f = quantity / base.per;
     const meal = MEALS.includes(req.body?.meal) ? req.body.meal : entry.meal;
 
     await sql`update entries set quantity = ${quantity}, meal = ${meal},
         kcal = ${base.kcal * f}, protein = ${base.protein * f},
-        carbs = ${base.carbs * f}, fat = ${base.fat * f}
+        carbs = ${base.carbs * f}, fat = ${base.fat * f}, fiber = ${base.fiber * f}
       where id = ${entry.id}`;
     res.json({ ok: true });
   })
@@ -423,17 +436,33 @@ r.delete(
   })
 );
 
-// Repete um dia inteiro em outra data — útil quando a rotina se repete.
+// Traz registros de outro dia: uma lista escolhida (ids) ou o dia inteiro (from).
 r.post(
   '/entries/copy',
   auth,
   go(async (req, res) => {
-    const from = isDate(req.body?.from) ? req.body.from : null;
     const to = isDate(req.body?.to) ? req.body.to : null;
-    if (!from || !to) return res.status(400).json({ error: 'Datas inválidas.' });
+    if (!to) return res.status(400).json({ error: 'Data de destino inválida.' });
+
+    const ids = Array.isArray(req.body?.ids)
+      ? req.body.ids.map((n) => Math.trunc(num(n))).filter((n) => n > 0).slice(0, 200)
+      : null;
+
+    if (ids) {
+      if (ids.length === 0) return res.status(400).json({ error: 'Escolha ao menos um item.' });
+      const rows = await sql`
+        insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber)
+        select user_id, food_id, ${to}, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber
+        from entries where user_id = ${req.uid} and id = any(${ids})
+        returning id`;
+      return res.json({ copied: rows.length });
+    }
+
+    const from = isDate(req.body?.from) ? req.body.from : null;
+    if (!from) return res.status(400).json({ error: 'Data de origem inválida.' });
     const rows = await sql`
-      insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat)
-      select user_id, food_id, ${to}, meal, quantity, name, unit, kcal, protein, carbs, fat
+      insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber)
+      select user_id, food_id, ${to}, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber
       from entries where user_id = ${req.uid} and date = ${from}
       returning id`;
     res.json({ copied: rows.length });
@@ -592,7 +621,8 @@ r.get(
     const [daily, water, weights, habits, logs] = await Promise.all([
       sql`select to_char(date, 'YYYY-MM-DD') as date,
                  sum(kcal)::float8 as kcal, sum(protein)::float8 as protein,
-                 sum(carbs)::float8 as carbs, sum(fat)::float8 as fat
+                 sum(carbs)::float8 as carbs, sum(fat)::float8 as fat,
+                 sum(fiber)::float8 as fiber
           from entries where user_id = ${req.uid} and date >= ${from}
           group by date order by date`,
       sql`select to_char(date, 'YYYY-MM-DD') as date, ml
@@ -617,6 +647,7 @@ r.get(
         protein: round(d?.protein || 0),
         carbs: round(d?.carbs || 0),
         fat: round(d?.fat || 0),
+        fiber: round(d?.fiber || 0),
         water: waterBy[date] || 0,
       });
     }

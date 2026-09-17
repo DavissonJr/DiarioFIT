@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Search, Plus, ChevronLeft, Star, Trash2 } from 'lucide-react';
 import { api } from '../lib/api';
 import { MEALS, parseNum, n0, n1, qty as fmtQty } from '../lib/nutri';
-import { Sheet, Button, Empty, ErrorNote, toast } from './ui';
+import { Sheet, Button, Empty, ErrorNote, Loading, toast } from './ui';
 import FoodForm from './FoodForm';
 
 const norm = (s) =>
@@ -57,6 +57,7 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
               protein: entry.protein,
               carbs: entry.carbs,
               fat: entry.fat,
+              fiber: entry.fiber,
             }
           );
         }
@@ -78,6 +79,7 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
         protein: picked.protein * factor,
         carbs: picked.carbs * factor,
         fat: picked.fat * factor,
+        fiber: (picked.fiber || 0) * factor,
       }
     : null;
 
@@ -145,11 +147,11 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
           step === 'qty' ? (
             <div className="flex gap-3">
               {editing && (
-                <Button variant="danger" onClick={removeEntry} aria-label="Apagar registro">
-                  <Trash2 size={18} />
+                <Button variant="danger" onClick={removeEntry} disabled={busy}>
+                  <Trash2 size={18} /> Remover
                 </Button>
               )}
-              <Button className="flex-1" loading={busy} onClick={save}>
+              <Button className="flex-1" loading={busy} disabled={!picked} onClick={save}>
                 {editing ? 'Salvar' : `Adicionar ${n0(preview?.kcal || 0)} kcal`}
               </Button>
             </div>
@@ -207,7 +209,7 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
                   <li key={f.id}>
                     <button
                       onClick={() => choose(f)}
-                      className="flex w-full items-center gap-3 py-3 text-left transition active:bg-base"
+                      className="flex w-full items-center gap-3 py-3 text-left transition active:bg-canvas"
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium">
@@ -235,6 +237,8 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
               </ul>
             )}
           </div>
+        ) : !picked ? (
+          <Loading label="Abrindo o registro" />
         ) : (
           <div className="space-y-5 pb-2">
             {!editing && (
@@ -265,7 +269,7 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
                     key={v}
                     onClick={() => setQuantity(String(v))}
                     className={`rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[.97] ${
-                      amount === v ? 'bg-leaf-500 text-white' : 'bg-base text-mute'
+                      amount === v ? 'bg-leaf-500 text-white' : 'bg-canvas text-mute'
                     }`}
                   >
                     {v} {unitLabel}
@@ -274,14 +278,15 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
               </div>
             </div>
 
-            <div className="rounded-2xl bg-base p-4">
+            <div className="rounded-2xl bg-canvas p-4">
               <p className="font-display text-3xl font-semibold tnum">
                 {n0(preview.kcal)} <span className="text-lg text-mute">kcal</span>
               </p>
-              <div className="mt-2 flex gap-4 text-sm tnum">
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm tnum">
                 <span className="text-prot">{n1(preview.protein)} g proteína</span>
                 <span className="text-carb">{n1(preview.carbs)} g carbo</span>
                 <span className="text-fat">{n1(preview.fat)} g gordura</span>
+                <span className="text-fiber">{n1(preview.fiber)} g fibra</span>
               </div>
             </div>
 
@@ -293,7 +298,7 @@ export default function AddEntry({ open, date, meal = 'almoco', entry, onClose, 
                     key={m.id}
                     onClick={() => setMealId(m.id)}
                     className={`rounded-2xl px-2 py-3 text-sm font-semibold transition ${
-                      mealId === m.id ? 'bg-leaf-500 text-white' : 'bg-base text-mute'
+                      mealId === m.id ? 'bg-leaf-500 text-white' : 'bg-canvas text-mute'
                     }`}
                   >
                     {m.label}

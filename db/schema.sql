@@ -15,6 +15,7 @@ create table if not exists users (
   target_protein int  default 110,
   target_carbs   int  default 230,
   target_fat     int  default 65,
+  target_fiber   int  default 25,
   target_water   int  default 2000,
   created_at     timestamptz default now()
 );
@@ -53,6 +54,7 @@ create table if not exists entries (
   protein  numeric not null default 0,
   carbs    numeric not null default 0,
   fat      numeric not null default 0,
+  fiber    numeric not null default 0,
   created_at timestamptz default now()
 );
 create index if not exists entries_user_date_idx on entries(user_id, date);

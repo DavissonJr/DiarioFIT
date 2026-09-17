@@ -9,7 +9,7 @@
   }
 
   body {
-    @apply bg-base text-ink font-sans antialiased;
+    @apply bg-canvas text-ink font-sans antialiased;
     overscroll-behavior-y: none;
   }
 
@@ -23,7 +23,7 @@
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-leaf-500 ring-offset-2 ring-offset-base rounded-lg;
+    @apply outline-none ring-2 ring-leaf-500 ring-offset-2 ring-offset-canvas rounded-lg;
   }
 
   /* Tira as setinhas dos campos numéricos. */

@@ -44,6 +44,7 @@ export default function Profile() {
         protein: String(user.targets.protein),
         carbs: String(user.targets.carbs),
         fat: String(user.targets.fat),
+        fiber: String(user.targets.fiber),
         water: String(user.targets.water),
       },
     });
@@ -73,6 +74,7 @@ export default function Profile() {
             protein: parseNum(form.targets.protein),
             carbs: parseNum(form.targets.carbs),
             fat: parseNum(form.targets.fat),
+            fiber: parseNum(form.targets.fiber),
             water: parseNum(form.targets.water),
           },
         },
@@ -128,7 +130,10 @@ export default function Profile() {
             {targetField('carbs', 'Carboidrato', 'g')}
             {targetField('fat', 'Gordura', 'g')}
           </div>
-          {targetField('water', 'Água', 'ml')}
+          <div className="grid grid-cols-2 gap-3">
+            {targetField('fiber', 'Fibra', 'g')}
+            {targetField('water', 'Água', 'ml')}
+          </div>
         </div>
       </section>
 
@@ -229,6 +234,7 @@ export default function Profile() {
               protein: String(t.protein),
               carbs: String(t.carbs),
               fat: String(t.fat),
+              fiber: String(t.fiber),
               water: String(t.water),
             },
           }))
@@ -253,7 +259,7 @@ function CalcSheet({ open, onClose, profile, onApply }) {
     api('/weights')
       .then(({ weights }) => {
         const last = weights[weights.length - 1];
-        if (last) setWeight(String(last.kg));
+        if (last) setWeight(String(last.kg).replace('.', ','));
       })
       .catch(() => {});
   }, [open]);
@@ -311,7 +317,7 @@ function CalcSheet({ open, onClose, profile, onApply }) {
         </Field>
 
         {missing.length > 0 ? (
-          <p className="rounded-2xl bg-base px-4 py-3 text-sm text-mute">
+          <p className="rounded-2xl bg-canvas px-4 py-3 text-sm text-mute">
             Para calcular, falta preencher: {missing.join(', ')}. Complete em “Sobre você” e volte
             aqui.
           </p>
@@ -327,14 +333,15 @@ function CalcSheet({ open, onClose, profile, onApply }) {
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
               <Macro label="Proteína" value={result.protein} tone="text-prot" />
               <Macro label="Carboidrato" value={result.carbs} tone="text-carb" />
               <Macro label="Gordura" value={result.fat} tone="text-fat" />
+              <Macro label="Fibra" value={result.fiber} tone="text-fiber" />
             </div>
 
             {result.floored && (
-              <p className="rounded-2xl bg-base px-4 py-3 text-sm text-mute">
+              <p className="rounded-2xl bg-canvas px-4 py-3 text-sm text-mute">
                 Esse é o valor mínimo que faz sentido sugerir para o seu corpo. Cortes maiores
                 costumam cobrar caro em energia e humor.
               </p>
@@ -350,7 +357,7 @@ function CalcSheet({ open, onClose, profile, onApply }) {
 
 function Macro({ label, value, tone }) {
   return (
-    <div className="rounded-2xl bg-base p-3">
+    <div className="rounded-2xl bg-canvas p-3">
       <p className={`font-display text-xl font-semibold tnum ${tone}`}>{value} g</p>
       <p className="mt-0.5 text-xs text-mute">{label}</p>
     </div>
@@ -400,7 +407,7 @@ function HabitsCard() {
             <li key={h.id}>
               <button
                 onClick={() => setEditing(h)}
-                className="flex w-full items-center gap-3 py-3 text-left transition active:bg-base"
+                className="flex w-full items-center gap-3 py-3 text-left transition active:bg-canvas"
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{h.name}</p>
@@ -521,7 +528,7 @@ function HabitSheet({ open, habit, onClose, onSaved }) {
                 key={d.id}
                 onClick={() => toggleDay(d.id)}
                 className={`h-11 flex-1 rounded-xl font-semibold transition active:scale-95 ${
-                  weekdays.includes(d.id) ? 'bg-leaf-500 text-white' : 'bg-base text-mute'
+                  weekdays.includes(d.id) ? 'bg-leaf-500 text-white' : 'bg-canvas text-mute'
                 }`}
                 aria-pressed={weekdays.includes(d.id)}
               >

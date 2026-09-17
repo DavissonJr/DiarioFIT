@@ -32,7 +32,7 @@ export default function Layout({ children }) {
               end={end}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-2xl px-3 py-3 font-semibold transition ${
-                  isActive ? 'bg-leaf-50 text-leaf-600' : 'text-mute hover:bg-base hover:text-ink'
+                  isActive ? 'bg-leaf-50 text-leaf-600' : 'text-mute hover:bg-canvas hover:text-ink'
                 }`
               }
             >

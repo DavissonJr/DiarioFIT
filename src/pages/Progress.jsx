@@ -176,7 +176,7 @@ export default function Progress() {
                           {h.done} de {h.planned}
                         </span>
                       </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-base">
+                      <div className="h-2 overflow-hidden rounded-full bg-canvas">
                         <div
                           className="h-full rounded-full bg-leaf-500 transition-[width] duration-500"
                           style={{ width: `${pct}%` }}
@@ -265,7 +265,7 @@ function WeightSheet({ open, onClose, onSaved, last }) {
 
   useEffect(() => {
     if (open) {
-      setKg(last ? String(last.kg) : '');
+      setKg(last ? String(last.kg).replace('.', ',') : '');
       setDate(todayISO());
       setError('');
     }

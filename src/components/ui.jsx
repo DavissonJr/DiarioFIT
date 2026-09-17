@@ -8,8 +8,8 @@ import { n0, n1 } from '../lib/nutri';
 const VARIANTS = {
   primary: 'bg-leaf-500 text-white hover:bg-leaf-600 active:bg-leaf-600 shadow-card',
   soft: 'bg-leaf-50 text-leaf-600 hover:bg-leaf-100',
-  outline: 'border border-line text-ink hover:bg-base',
-  ghost: 'text-mute hover:bg-base hover:text-ink',
+  outline: 'border border-line text-ink hover:bg-canvas',
+  ghost: 'text-mute hover:bg-canvas hover:text-ink',
   danger: 'bg-prot/10 text-prot hover:bg-prot/15',
 };
 
@@ -112,7 +112,7 @@ export function Field({ label, hint, children, className = '' }) {
 
 export function Segmented({ options, value, onChange, className = '' }) {
   return (
-    <div className={`flex gap-1 rounded-2xl bg-base p-1 ${className}`}>
+    <div className={`flex gap-1 rounded-2xl bg-canvas p-1 ${className}`}>
       {options.map((o) => (
         <button
           key={o.id}
@@ -171,7 +171,7 @@ export function MacroBar({ label, value, target, colorClass }) {
           <span className="text-mute/70"> / {n0(target)} g</span>
         </span>
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-base">
+      <div className="h-2 overflow-hidden rounded-full bg-canvas">
         <div
           className={`h-full rounded-full transition-[width] duration-500 ${colorClass}`}
           style={{ width: `${pct}%` }}

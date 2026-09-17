@@ -108,6 +108,7 @@ export function suggestTargets({ sex, weightKg, heightCm, age, activity, goal })
   const protein = Math.round(weightKg * 1.8);
   const fat = Math.round((kcal * 0.25) / 9);
   const carbs = Math.max(0, Math.round((kcal - protein * 4 - fat * 9) / 4));
+  const fiber = Math.round((kcal / 1000) * 14);
   const water = Math.round((weightKg * 35) / 100) * 100;
 
   return {
@@ -115,6 +116,7 @@ export function suggestTargets({ sex, weightKg, heightCm, age, activity, goal })
     protein,
     carbs,
     fat,
+    fiber,
     water,
     maintenance: Math.round(maintenance),
     floored: kcal === floor && adjust < 0,

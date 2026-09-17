@@ -107,7 +107,7 @@ export default function Foods() {
 
                 <button
                   onClick={() => setEditing(f)}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-3 pr-3 text-left transition active:bg-base"
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-3 pr-3 text-left transition active:bg-canvas"
                 >
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium">{f.name}</span>

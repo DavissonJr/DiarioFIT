@@ -6,6 +6,7 @@ import { todayISO, addDays, dateLabel, MEALS, mealNow, n0, n1, qty } from '../li
 import { Button, DayBar, MacroBar, Loading, ErrorNote, Empty, toast } from '../components/ui';
 import AddEntry from '../components/AddEntry';
 import Fab from '../components/Fab';
+import ImportDay from '../components/ImportDay';
 
 const MOODS = ['Ótimo', 'Bem', 'Normal', 'Cansada', 'Difícil'];
 
@@ -15,6 +16,7 @@ export default function Today() {
   const [day, setDay] = useState(null);
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(null); // { meal } ou { entry }
+  const [importing, setImporting] = useState(false);
   const [note, setNote] = useState('');
 
   const targets = user.targets;
@@ -62,19 +64,6 @@ export default function Today() {
     api('/note', { method: 'PUT', body }).catch((err) => toast(err.message, 'error'));
   }
 
-  async function repeatYesterday() {
-    try {
-      const { copied } = await api('/entries/copy', {
-        method: 'POST',
-        body: { from: addDays(date, -1), to: date },
-      });
-      toast(copied ? `${copied} itens copiados` : 'Ontem não tem registros');
-      load();
-    } catch (err) {
-      toast(err.message, 'error');
-    }
-  }
-
   /* render --------------------------------------------------------------- */
 
   const isToday = date === todayISO();
@@ -85,7 +74,7 @@ export default function Today() {
 
   return (
     <div className="pt-4 md:pt-8">
-      <header className="sticky top-0 z-30 -mx-4 mb-4 flex items-center gap-1 bg-base px-4 py-2 md:-mx-8 md:px-8">
+      <header className="sticky top-0 z-30 -mx-4 mb-4 flex items-center gap-1 bg-canvas px-4 py-2 md:-mx-8 md:px-8">
         <Button
           variant="ghost"
           size="icon"
@@ -129,16 +118,19 @@ export default function Today() {
             <div className="flex items-end justify-between gap-4">
               <div>
                 <p className="font-display text-[46px] font-semibold leading-none tnum">
-                  {n0(Math.abs(remaining))}
+                  {n0(totals.kcal)}
                 </p>
                 <p className="mt-1.5 text-sm text-mute">
-                  {remaining >= 0 ? 'kcal para a meta de ' : 'kcal acima da meta de '}
-                  <span className="tnum">{n0(targets.kcal)}</span>
+                  kcal de <span className="tnum">{n0(targets.kcal)}</span> no dia
                 </p>
               </div>
               <div className="text-right">
-                <p className="font-display text-2xl font-semibold tnum">{n0(totals.kcal)}</p>
-                <p className="text-xs text-mute">no dia</p>
+                <p className="font-display text-2xl font-semibold leading-none tnum">
+                  {n0(Math.abs(remaining))}
+                </p>
+                <p className="mt-1 text-xs text-mute">
+                  {remaining >= 0 ? 'ainda cabem' : 'acima da meta'}
+                </p>
               </div>
             </div>
 
@@ -174,6 +166,12 @@ export default function Today() {
                 value={totals.fat}
                 target={targets.fat}
                 colorClass="bg-fat"
+              />
+              <MacroBar
+                label="Fibra"
+                value={totals.fiber}
+                target={targets.fiber}
+                colorClass="bg-fiber"
               />
             </div>
           </section>
@@ -266,8 +264,8 @@ export default function Today() {
                       <Button onClick={() => setAdding({ meal: mealNow() })}>
                         Anotar o que comeu
                       </Button>
-                      <Button variant="outline" onClick={repeatYesterday}>
-                        <CopyPlus size={18} /> Repetir ontem
+                      <Button variant="outline" onClick={() => setImporting(true)}>
+                        <CopyPlus size={18} /> Trazer de outro dia
                       </Button>
                     </div>
                   }
@@ -310,7 +308,7 @@ export default function Today() {
                         <li key={e.id}>
                           <button
                             onClick={() => setAdding({ entry: e })}
-                            className="flex w-full items-center gap-3 rounded-xl py-2.5 text-left transition active:bg-base"
+                            className="flex w-full items-center gap-3 rounded-xl py-2.5 text-left transition active:bg-canvas"
                           >
                             <div className="min-w-0 flex-1">
                               <p className="truncate font-medium">{e.name}</p>
@@ -341,7 +339,7 @@ export default function Today() {
                   key={m}
                   onClick={() => saveNote(day.note?.mood === m ? null : m)}
                   className={`rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[.97] ${
-                    day.note?.mood === m ? 'bg-leaf-500 text-white' : 'bg-base text-mute'
+                    day.note?.mood === m ? 'bg-leaf-500 text-white' : 'bg-canvas text-mute'
                   }`}
                 >
                   {m}
@@ -358,14 +356,21 @@ export default function Today() {
           </section>
 
           {day.entries.length > 0 && (
-            <Button variant="outline" className="w-full" onClick={repeatYesterday}>
-              <CopyPlus size={18} /> Copiar os itens de ontem para cá
+            <Button variant="outline" className="w-full" onClick={() => setImporting(true)}>
+              <CopyPlus size={18} /> Trazer itens de outro dia
             </Button>
           )}
         </div>
       )}
 
       <Fab onClick={() => setAdding({ meal: mealNow() })} label="Anotar alimento" />
+
+      <ImportDay
+        open={importing}
+        date={date}
+        onClose={() => setImporting(false)}
+        onImported={load}
+      />
 
       <AddEntry
         open={!!adding}

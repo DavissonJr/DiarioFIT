@@ -189,6 +189,36 @@ console.log('\nRegistro do dia e cálculo');
   });
   check('copia o dia inteiro', copy.data.copied === 2, copy.data);
 
+  // Cópia escolhida item a item.
+  const dayIds = await call(`/day?date=${iso()}`);
+  const um = dayIds.data.entries[0].id;
+  const sel = await call('/entries/copy', { method: 'POST', body: { ids: [um], to: iso(2) } });
+  check('copia só os itens escolhidos', sel.data.copied === 1, sel.data);
+  const alvo = await call(`/day?date=${iso(2)}`);
+  check('o destino recebe apenas o escolhido', alvo.data.entries.length === 1, alvo.data.entries);
+  check('o item copiado mantém a refeição', alvo.data.entries[0].meal === dayIds.data.entries[0].meal, alvo.data.entries[0]);
+  const vazio = await call('/entries/copy', { method: 'POST', body: { ids: [], to: iso(2) } });
+  check('recusa cópia sem nenhum item', vazio.status === 400, vazio.data);
+  await call(`/entries/${alvo.data.entries[0].id}`, { method: 'DELETE' });
+
+  // Fibra acompanha a mesma proporção dos outros nutrientes.
+  const aveia = await call('/foods', {
+    method: 'POST',
+    body: { name: 'Aveia teste', baseQty: 100, unit: 'g', kcal: 390, protein: 14, carbs: 66, fat: 8, fiber: 10 },
+  });
+  await call('/entries', {
+    method: 'POST',
+    body: { foodId: aveia.data.food.id, date: iso(), meal: 'cafe', quantity: 50 },
+  });
+  const comFibra = await call(`/day?date=${iso()}`);
+  const reg = comFibra.data.entries.find((e) => e.name === 'Aveia teste');
+  check('50 g de um alimento com 10 g de fibra = 5 g', reg.fiber === 5, reg);
+  check('fibra entra no total do dia', comFibra.data.totals.fiber === 5, comFibra.data.totals);
+  await call(`/entries/${reg.id}`, { method: 'PUT', body: { quantity: 100 } });
+  const recalc = await call(`/day?date=${iso()}`);
+  check('fibra recalcula ao editar a quantidade', recalc.data.totals.fiber === 10, recalc.data.totals);
+  await call(`/entries/${reg.id}`, { method: 'DELETE' });
+
   const del = await call(`/entries/${entry.id}`, { method: 'DELETE' });
   check('apaga um registro', del.status === 200);
   const day5 = await call(`/day?date=${iso()}`);
@@ -261,6 +291,12 @@ console.log('\nIsolamento entre contas');
   const steal = await call(`/entries/${1}`, { method: 'PUT', body: { quantity: 5 } });
   check('não edita registro de outra conta', steal.status === 404, steal.data);
 
+  const stealCopy = await call('/entries/copy', {
+    method: 'POST',
+    body: { ids: [1, 2, 3], to: iso() },
+  });
+  check('não copia registros de outra conta', stealCopy.data.copied === 0, stealCopy.data);
+
   token = anaToken;
 }
 
@@ -275,16 +311,23 @@ console.log('\nPerfil');
       heightCm: 165,
       activity: 'moderada',
       goal: 'perder',
-      targets: { kcal: 1800, protein: 120, carbs: 180, fat: 55, water: 2200 },
+      targets: { kcal: 1800, protein: 120, carbs: 180, fat: 55, fiber: 28, water: 2200 },
     },
   });
   check('salva perfil e metas', p.data.user.targets.kcal === 1800 && p.data.user.heightCm === 165, p.data.user);
+  check('salva a meta de fibra', p.data.user.targets.fiber === 28, p.data.user.targets);
 
   const floor = await call('/profile', {
     method: 'PUT',
     body: { name: 'Ana', targets: { kcal: 300 } },
   });
   check('impõe piso de calorias no servidor', floor.data.user.targets.kcal === 1000, floor.data.user.targets);
+
+  // Atualização parcial não pode zerar nem apagar o que já estava salvo.
+  const parcial = await call('/profile', { method: 'PUT', body: { name: 'Ana Maria' } });
+  check('atualização parcial preserva as metas', parcial.data.user.targets.fiber === 28 && parcial.data.user.targets.protein === 120, parcial.data.user.targets);
+  check('atualização parcial preserva a altura', parcial.data.user.heightCm === 165, parcial.data.user);
+  check('atualização parcial troca só o que foi enviado', parcial.data.user.name === 'Ana Maria', parcial.data.user);
 
   const wrong = await call('/profile/password', {
     method: 'PUT',

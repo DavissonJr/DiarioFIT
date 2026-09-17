@@ -4,7 +4,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        base: '#EFF2ED',
+        canvas: '#EFF2ED',
         surface: '#FFFFFF',
         ink: '#16221C',
         mute: '#61706A',
@@ -21,6 +21,7 @@ export default {
         prot: '#C0553F',
         carb: '#D9A036',
         fat: '#6E7FB8',
+        fiber: '#7A8C4E',
         water: '#3E86A0',
       },
       fontFamily: {
