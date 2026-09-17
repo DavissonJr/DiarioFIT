@@ -44,88 +44,6 @@ Front e API saem do mesmo domínio, então não existe configuração de CORS pa
 
 ---
 
-## Publicar (leva uns 10 minutos)
-
-### 1. Criar o banco no Neon
-
-1. Entre em <https://neon.tech> e crie um projeto. Escolha a região mais perto (`South America (São Paulo)`).
-2. Em **SQL Editor**, cole todo o conteúdo de `db/schema.sql` e execute.
-3. Em **Connection string**, copie a opção **Pooled connection**. Ela se parece com:
-
-   ```
-   postgresql://usuario:senha@ep-xxx-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require
-   ```
-
-   Use a versão *pooler*: é a indicada para funções serverless.
-
-### 2. Subir o código para o GitHub
-
-```bash
-git init
-git add .
-git commit -m "primeira versão"
-git branch -M main
-git remote add origin https://github.com/SEU-USUARIO/diario.git
-git push -u origin main
-```
-
-### 3. Publicar na Vercel
-
-1. Em <https://vercel.com>, clique em **Add New → Project** e importe o repositório.
-2. O framework é detectado como Vite. Não precisa mexer em build nem em output.
-3. Em **Environment Variables**, cadastre as três:
-
-   | Nome | Valor |
-   |---|---|
-   | `DATABASE_URL` | a string do Neon copiada no passo 1 |
-   | `JWT_SECRET` | uma frase longa e aleatória (veja abaixo) |
-   | `TZ_OFFSET` | `-3` |
-
-   Para gerar o segredo:
-
-   ```bash
-   openssl rand -base64 48
-   ```
-
-4. Clique em **Deploy**. Ao terminar, abra o endereço, crie a conta e pronto.
-
-Para conferir se a API subiu, abra `https://seu-app.vercel.app/api/health`.
-A resposta deve ser `{"ok":true,"db":true}`.
-
-### 4. Instalar no celular e no tablet
-
-- **Android/Chrome**: abra o site, menu ⋮ → *Adicionar à tela inicial*.
-- **iPhone/iPad/Safari**: botão de compartilhar → *Adicionar à Tela de Início*.
-
-Instalado, abre em tela cheia, sem barra de navegador, com ícone próprio.
-
----
-
-## Rodar na sua máquina
-
-```bash
-npm install
-cp .env.example .env    # preencha DATABASE_URL e JWT_SECRET
-npm run dev
-```
-
-Sobe a API em `http://localhost:3001` e o app em `http://localhost:5173`, já com o
-encaminhamento de `/api` configurado. Como o Vite está com `host: true`, dá para abrir
-pelo celular na mesma rede usando o IP da sua máquina, por exemplo `http://192.168.0.10:5173`.
-
-### Testes da API
-
-```bash
-npm install --no-save @electric-sql/pglite
-node test/run.mjs
-```
-
-Sobe um Postgres de verdade em WebAssembly, aplica o `schema.sql` e roda 50 verificações:
-cálculo proporcional das porções, edição e remoção de registros, isolamento entre contas,
-hábitos, água, peso e as regras de segurança do login. Não precisa de banco externo.
-
----
-
 ## Detalhes que podem te interessar
 
 **Fotografia dos valores.** Cada registro do diário guarda as calorias e os macros já
@@ -138,7 +56,7 @@ resolve isso; o front sempre manda a data local junto.
 
 **Piso calórico.** A sugestão de metas nunca desce abaixo de 1200 kcal nem abaixo do
 metabolismo basal estimado, e o servidor recusa metas abaixo de 1000 kcal. Passar da meta
-não gera nenhum alerta vermelho no app — a tela fica neutra, de propósito.
+não gera nenhum alerta vermelho no app, a tela fica neutra, de propósito.
 
 **Trocar o idioma dos textos, cores ou fontes.** As cores e as fontes estão todas em
 `tailwind.config.js`. Os textos ficam nos próprios componentes, em português.
