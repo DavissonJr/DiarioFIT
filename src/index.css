@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-base text-ink font-sans antialiased;
+    overscroll-behavior-y: none;
+  }
+
+  /* 16px evita o zoom automático do Safari ao focar um campo. */
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+    font-family: inherit;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-leaf-500 ring-offset-2 ring-offset-base rounded-lg;
+  }
+
+  /* Tira as setinhas dos campos numéricos. */
+  input[type='number']::-webkit-outer-spin-button,
+  input[type='number']::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type='number'] {
+    -moz-appearance: textfield;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-surface rounded-3xl shadow-card;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-line bg-surface px-4 py-3 text-ink
+           placeholder:text-mute/60 focus:border-leaf-500 focus:outline-none
+           focus:ring-2 focus:ring-leaf-100;
+  }
+
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

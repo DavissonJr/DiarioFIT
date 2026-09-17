@@ -1,0 +1,311 @@
+/**
+ * Testa a API de ponta a ponta contra um Postgres real (PGlite, em WASM).
+ * Não faz parte do app: roda só aqui, com `node test/run.mjs`.
+ */
+import { PGlite } from '@electric-sql/pglite';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { createServer } from 'node:http';
+
+const db = new PGlite();
+await db.exec(readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8'));
+
+// Adapta o template `sql` do driver do Neon para o PGlite.
+const shim = `
+export function neon() {
+  return globalThis.__sql;
+}
+`;
+mkdirSync(new URL('./tmp/', import.meta.url), { recursive: true });
+writeFileSync(new URL('./tmp/neon-shim.mjs', import.meta.url), shim);
+
+globalThis.__sql = async (strings, ...values) => {
+  const text = strings.reduce(
+    (acc, part, i) => acc + part + (i < values.length ? `$${i + 1}` : ''),
+    ''
+  );
+  const res = await db.query(text, values);
+  return res.rows;
+};
+
+const source = readFileSync(new URL('../api/index.js', import.meta.url), 'utf8').replace(
+  `from '@neondatabase/serverless'`,
+  `from '../test/tmp/neon-shim.mjs'`
+);
+writeFileSync(new URL('../api/index.test.mjs', import.meta.url), source);
+
+process.env.JWT_SECRET = 'segredo-de-teste';
+const { default: app } = await import('../api/index.test.mjs');
+
+const server = createServer(app);
+await new Promise((r) => server.listen(0, r));
+const base = `http://127.0.0.1:${server.address().port}/api`;
+
+/* ----------------------------------------------------------------- ajuda */
+
+let token = null;
+let failures = 0;
+let count = 0;
+
+async function call(path, { method = 'GET', body } = {}) {
+  const res = await fetch(base + path, {
+    method,
+    headers: {
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return { status: res.status, data: await res.json().catch(() => null) };
+}
+
+function check(label, condition, detail) {
+  count++;
+  if (condition) {
+    console.log(`  ok   ${label}`);
+  } else {
+    failures++;
+    console.log(`  FALHA ${label}${detail ? ` → ${JSON.stringify(detail)}` : ''}`);
+  }
+}
+
+const iso = (offset = 0) => {
+  const d = new Date(Date.now() - 3 * 3600000 + offset * 86400000);
+  return d.toISOString().slice(0, 10);
+};
+
+/* ----------------------------------------------------------------- casos */
+
+console.log('\nConta e sessão');
+{
+  const r = await call('/auth/register', {
+    method: 'POST',
+    body: { name: 'Ana', email: 'ANA@Teste.com', password: 'segredo123' },
+  });
+  check('cria conta e devolve token', r.status === 201 && !!r.data.token, r.data);
+  token = r.data.token;
+
+  const dup = await call('/auth/register', {
+    method: 'POST',
+    body: { name: 'Ana', email: 'ana@teste.com', password: 'segredo123' },
+  });
+  check('bloqueia e-mail repetido', dup.status === 409, dup.data);
+
+  const weak = await call('/auth/register', {
+    method: 'POST',
+    body: { name: 'Bia', email: 'bia@teste.com', password: '123' },
+  });
+  check('recusa senha curta', weak.status === 400, weak.data);
+
+  const bad = await call('/auth/login', {
+    method: 'POST',
+    body: { email: 'ana@teste.com', password: 'errada' },
+  });
+  check('recusa senha errada', bad.status === 401, bad.data);
+
+  const good = await call('/auth/login', {
+    method: 'POST',
+    body: { email: 'ana@teste.com', password: 'segredo123' },
+  });
+  check('entra com a senha certa', good.status === 200 && !!good.data.token, good.data);
+
+  const saved = token;
+  token = null;
+  const anon = await call('/foods');
+  check('bloqueia acesso sem token', anon.status === 401);
+  token = 'abc.invalido.xyz';
+  const fake = await call('/foods');
+  check('bloqueia token inválido', fake.status === 401);
+  token = saved;
+}
+
+console.log('\nAlimentos');
+let frango, ovo;
+{
+  const seeded = await call('/foods');
+  check('conta nova já vem com alimentos', seeded.data.foods.length >= 20, seeded.data.foods.length);
+
+  const r = await call('/foods', {
+    method: 'POST',
+    body: { name: 'Frango teste', baseQty: 100, unit: 'g', kcal: 160, protein: 32, carbs: 0, fat: 3.2 },
+  });
+  frango = r.data.food;
+  check('cadastra alimento', r.status === 201 && frango.kcal === 160, r.data);
+
+  const u = await call('/foods', {
+    method: 'POST',
+    body: { name: 'Ovo teste', baseQty: 1, unit: 'un', kcal: 74, protein: 6.3, carbs: 0.6, fat: 5 },
+  });
+  ovo = u.data.food;
+  check('cadastra alimento por unidade', ovo.unit === 'un' && ovo.baseQty === 1, u.data);
+
+  const invalid = await call('/foods', { method: 'POST', body: { name: '', kcal: 10 } });
+  check('recusa alimento sem nome', invalid.status === 400);
+
+  const fav = await call(`/foods/${frango.id}/favorite`, { method: 'POST' });
+  check('marca favorito', fav.data.food.favorite === true);
+
+  const search = await call('/foods?q=frang');
+  check('busca por nome', search.data.foods.some((f) => f.id === frango.id));
+}
+
+console.log('\nRegistro do dia e cálculo');
+{
+  const a = await call('/entries', {
+    method: 'POST',
+    body: { foodId: frango.id, date: iso(), meal: 'almoco', quantity: 170 },
+  });
+  check('registra 170 g', a.status === 201, a.data);
+
+  const day = await call(`/day?date=${iso()}`);
+  const entry = day.data.entries[0];
+  // 170 g de um alimento com 160 kcal/100 g = 272 kcal
+  check('calcula 170 g × 160 kcal/100 g = 272', entry.kcal === 272, entry);
+  check('calcula proteína proporcional', Math.abs(entry.protein - 54.4) < 0.05, entry.protein);
+  check('soma o total do dia', day.data.totals.kcal === 272, day.data.totals);
+
+  const b = await call('/entries', {
+    method: 'POST',
+    body: { foodId: ovo.id, date: iso(), meal: 'cafe', quantity: 2 },
+  });
+  check('registra 2 unidades', b.status === 201);
+
+  const day2 = await call(`/day?date=${iso()}`);
+  check('2 ovos = 148 kcal', day2.data.entries.find((e) => e.meal === 'cafe').kcal === 148, day2.data.entries);
+  check('total acumula as refeições', day2.data.totals.kcal === 420, day2.data.totals);
+
+  const edit = await call(`/entries/${entry.id}`, { method: 'PUT', body: { quantity: 100 } });
+  check('edita a quantidade', edit.status === 200);
+  const day3 = await call(`/day?date=${iso()}`);
+  check('recalcula após editar (100 g = 160)', day3.data.totals.kcal === 308, day3.data.totals);
+
+  // Apagar o alimento não pode alterar o histórico.
+  await call(`/foods/${frango.id}`, { method: 'DELETE' });
+  const day4 = await call(`/day?date=${iso()}`);
+  check('histórico sobrevive ao apagar o alimento', day4.data.totals.kcal === 308, day4.data.totals);
+
+  const copy = await call('/entries/copy', {
+    method: 'POST',
+    body: { from: iso(), to: iso(1) },
+  });
+  check('copia o dia inteiro', copy.data.copied === 2, copy.data);
+
+  const del = await call(`/entries/${entry.id}`, { method: 'DELETE' });
+  check('apaga um registro', del.status === 200);
+  const day5 = await call(`/day?date=${iso()}`);
+  check('total cai após apagar', day5.data.totals.kcal === 148, day5.data.totals);
+}
+
+console.log('\nHábitos, água e peso');
+{
+  const day = await call(`/day?date=${iso()}`);
+  check('conta nova já vem com hábitos', day.data.habits.length >= 3, day.data.habits.length);
+
+  const habit = day.data.habits[0];
+  const on = await call(`/habits/${habit.id}/toggle`, { method: 'POST', body: { date: iso() } });
+  check('marca hábito', on.data.done === true);
+  const off = await call(`/habits/${habit.id}/toggle`, { method: 'POST', body: { date: iso() } });
+  check('desmarca hábito', off.data.done === false);
+  await call(`/habits/${habit.id}/toggle`, { method: 'POST', body: { date: iso() } });
+
+  const created = await call('/habits', {
+    method: 'POST',
+    body: { name: 'Alongar', weekdays: '135' },
+  });
+  check('cria hábito com dias escolhidos', created.data.habit.weekdays === '135', created.data);
+
+  const water = await call('/water', { method: 'PUT', body: { date: iso(), ml: 1500 } });
+  check('salva água', water.data.ml === 1500);
+  const dayW = await call(`/day?date=${iso()}`);
+  check('água aparece no dia', dayW.data.water === 1500);
+
+  await call('/weights', { method: 'PUT', body: { date: iso(-2), kg: 62.4 } });
+  await call('/weights', { method: 'PUT', body: { date: iso(), kg: 61.8 } });
+  const w = await call('/weights');
+  check('guarda a série de peso em ordem', w.data.weights.length === 2 && w.data.weights[1].kg === 61.8, w.data);
+
+  const over = await call('/weights', { method: 'PUT', body: { date: iso(), kg: 900 } });
+  check('recusa peso absurdo', over.status === 400);
+
+  const note = await call('/note', { method: 'PUT', body: { date: iso(), mood: 'Bem', body: 'dia tranquilo' } });
+  check('salva a nota do dia', note.status === 200);
+  const dayN = await call(`/day?date=${iso()}`);
+  check('nota volta no dia', dayN.data.note.mood === 'Bem' && dayN.data.note.body === 'dia tranquilo', dayN.data.note);
+}
+
+console.log('\nResumo');
+{
+  const s = await call('/stats?days=7');
+  check('série cobre os 7 dias', s.data.series.length === 7, s.data.series.length);
+  check('último item da série é hoje', s.data.series[6].date === iso(), s.data.series[6]);
+  check('hoje tem calorias na série', s.data.series[6].kcal === 148, s.data.series[6]);
+  check('traz o peso', s.data.weights.length === 2);
+  check('calcula sequência do hábito', s.data.habits.some((h) => h.streak >= 1), s.data.habits);
+  check('média considera só dias anotados', s.data.averages.daysLogged >= 1, s.data.averages);
+}
+
+console.log('\nIsolamento entre contas');
+{
+  const other = await call('/auth/register', {
+    method: 'POST',
+    body: { name: 'Bia', email: 'bia2@teste.com', password: 'segredo123' },
+  });
+  const anaToken = token;
+  token = other.data.token;
+
+  const foods = await call('/foods');
+  check('a outra conta não vê o alimento alheio', !foods.data.foods.some((f) => f.name === 'Ovo teste'), foods.data.foods.map((f) => f.name));
+
+  const day = await call(`/day?date=${iso()}`);
+  check('a outra conta não vê o dia alheio', day.data.totals.kcal === 0, day.data.totals);
+
+  const steal = await call(`/entries/${1}`, { method: 'PUT', body: { quantity: 5 } });
+  check('não edita registro de outra conta', steal.status === 404, steal.data);
+
+  token = anaToken;
+}
+
+console.log('\nPerfil');
+{
+  const p = await call('/profile', {
+    method: 'PUT',
+    body: {
+      name: 'Ana',
+      sex: 'f',
+      birthYear: 1998,
+      heightCm: 165,
+      activity: 'moderada',
+      goal: 'perder',
+      targets: { kcal: 1800, protein: 120, carbs: 180, fat: 55, water: 2200 },
+    },
+  });
+  check('salva perfil e metas', p.data.user.targets.kcal === 1800 && p.data.user.heightCm === 165, p.data.user);
+
+  const floor = await call('/profile', {
+    method: 'PUT',
+    body: { name: 'Ana', targets: { kcal: 300 } },
+  });
+  check('impõe piso de calorias no servidor', floor.data.user.targets.kcal === 1000, floor.data.user.targets);
+
+  const wrong = await call('/profile/password', {
+    method: 'PUT',
+    body: { current: 'errada', next: 'novasenha1' },
+  });
+  check('recusa troca de senha com senha atual errada', wrong.status === 401);
+
+  const ok = await call('/profile/password', {
+    method: 'PUT',
+    body: { current: 'segredo123', next: 'novasenha1' },
+  });
+  check('troca a senha', ok.status === 200);
+
+  const relogin = await call('/auth/login', {
+    method: 'POST',
+    body: { email: 'ana@teste.com', password: 'novasenha1' },
+  });
+  check('entra com a senha nova', relogin.status === 200);
+}
+
+console.log(`\n${count - failures}/${count} verificações passaram.`);
+server.close();
+await db.close();
+process.exit(failures ? 1 : 0);
