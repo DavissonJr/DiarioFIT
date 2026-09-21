@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { CalendarCheck, Flame, Droplet, Plus } from 'lucide-react';
+import { CalendarCheck, Flame, Droplet } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { todayISO, shortDate, weekdayShort, n0, n1, parseNum, bmi } from '../lib/nutri';
-import { Button, Sheet, Field, Segmented, Loading, ErrorNote, Empty, toast } from '../components/ui';
+import { shortDate, weekdayShort, n0, n1 } from '../lib/nutri';
+import { Segmented, Loading, ErrorNote, Empty } from '../components/ui';
+import WeightCard from '../components/WeightCard';
 
 const RANGES = [
   { id: '7', label: '7 dias' },
@@ -16,7 +17,6 @@ export default function Progress() {
   const [days, setDays] = useState('14');
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const [weighing, setWeighing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -33,11 +33,6 @@ export default function Progress() {
   }, [load]);
 
   const target = user.targets.kcal;
-  const weights = data?.weights || [];
-  const last = weights[weights.length - 1];
-  const first = weights[0];
-  const change = last && first ? last.kg - first.kg : 0;
-  const imc = last ? bmi(last.kg, user.heightCm) : null;
 
   const maxKcal = Math.max(target * 1.15, ...(data?.series.map((s) => s.kcal) || [0]), 1);
 
@@ -118,46 +113,7 @@ export default function Progress() {
             </div>
           </section>
 
-          {/* Peso */}
-          <section className="card p-5">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-display text-lg font-semibold">Peso</h2>
-                {last ? (
-                  <div className="mt-1">
-                    <p className="tnum font-display text-2xl font-semibold leading-none">
-                      {n1(last.kg)} kg
-                    </p>
-                    {weights.length > 1 && (
-                      <p className="tnum mt-1 text-sm text-mute">
-                        {change > 0 ? '+' : ''}
-                        {n1(change)} kg desde {shortDate(first.date)}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-sm text-mute">Nenhum registro ainda.</p>
-                )}
-              </div>
-              <Button variant="soft" size="sm" onClick={() => setWeighing(true)}>
-                <Plus size={16} /> Anotar
-              </Button>
-            </div>
-
-            {weights.length > 1 ? (
-              <WeightChart points={weights.slice(-40)} />
-            ) : (
-              <p className="text-sm text-mute">
-                Anote o peso uma vez por semana, sempre no mesmo horário, para a linha ficar útil.
-              </p>
-            )}
-
-            {imc && (
-              <p className="mt-3 text-xs text-mute">
-                IMC {n1(imc)} — é só uma referência geral, não diz nada sobre composição corporal.
-              </p>
-            )}
-          </section>
+          <WeightCard data={data} onChanged={load} />
 
           {/* Hábitos */}
           <section className="card p-5">
@@ -196,7 +152,6 @@ export default function Progress() {
         </div>
       )}
 
-      <WeightSheet open={weighing} onClose={() => setWeighing(false)} onSaved={load} last={last} />
     </div>
   );
 }
@@ -212,114 +167,5 @@ function Stat({ icon: Icon, value, unit, label }) {
       </p>
       <p className="mt-1 text-xs leading-tight text-mute">{label}</p>
     </div>
-  );
-}
-
-function WeightChart({ points }) {
-  const values = points.map((p) => p.kg);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = max - min || 1;
-  const pad = span * 0.2;
-  const lo = min - pad;
-  const hi = max + pad;
-
-  const coords = points.map((p, i) => ({
-    x: (i / Math.max(1, points.length - 1)) * 300,
-    y: 100 - ((p.kg - lo) / (hi - lo)) * 100,
-  }));
-  const line = coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
-  const area = `0,100 ${line} 300,100`;
-
-  return (
-    <div>
-      <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="h-28 w-full" role="img"
-           aria-label="Evolução do peso">
-        <polygon points={area} className="fill-brand-500" opacity="0.1" />
-        <polyline
-          points={line}
-          fill="none"
-          className="stroke-brand-500"
-          strokeWidth="2"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-          vectorEffect="non-scaling-stroke"
-        />
-      </svg>
-      <div className="mt-1 flex justify-between text-[11px] text-mute tnum">
-        <span>{shortDate(points[0].date)}</span>
-        <span>
-          {n1(min)} – {n1(max)} kg
-        </span>
-        <span>{shortDate(points[points.length - 1].date)}</span>
-      </div>
-    </div>
-  );
-}
-
-function WeightSheet({ open, onClose, onSaved, last }) {
-  const [kg, setKg] = useState('');
-  const [date, setDate] = useState(todayISO());
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (open) {
-      setKg(last ? String(last.kg).replace('.', ',') : '');
-      setDate(todayISO());
-      setError('');
-    }
-  }, [open, last]);
-
-  async function save() {
-    const value = parseNum(kg);
-    if (value <= 0) return setError('Informe um peso válido.');
-    setBusy(true);
-    try {
-      await api('/weights', { method: 'PUT', body: { date, kg: value } });
-      toast('Peso anotado');
-      onSaved();
-      onClose();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Anotar peso"
-      footer={
-        <Button className="w-full" loading={busy} onClick={save}>
-          Salvar
-        </Button>
-      }
-    >
-      <div className="space-y-4 pb-2">
-        <Field label="Peso em quilos">
-          <input
-            className="field tnum text-2xl font-semibold"
-            value={kg}
-            onChange={(e) => setKg(e.target.value)}
-            inputMode="decimal"
-            placeholder="0,0"
-            autoFocus
-          />
-        </Field>
-        <Field label="Data">
-          <input
-            type="date"
-            className="field"
-            value={date}
-            max={todayISO()}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </Field>
-        <ErrorNote>{error}</ErrorNote>
-      </div>
-    </Sheet>
   );
 }

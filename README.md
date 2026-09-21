@@ -23,6 +23,9 @@ Feito para funcionar bem no celular e no tablet, com instalação na tela de in�
 - **Água** em copos de 250 ml.
 - **Hábitos** com dias da semana escolhidos, marcação diária e sequência de dias seguidos.
 - **Peso** com gráfico de evolução e IMC de referência.
+- **Meta de peso sem prazo**: o progresso usa a tendência (média móvel), não a pesagem do dia,
+  e o app estima quando ela chega lá pelo ritmo real das últimas semanas. Avisos discretos se a
+  meta ficar abaixo de IMC 18,5 ou se a perda passar de 1% do peso por semana.
 - **Humor e anotação** do dia.
 - **Progresso** em 7, 14 ou 30 dias: calorias por dia contra a meta, médias e conclusão dos hábitos.
 - **Metas** escritas na mão ou sugeridas pela equação de Mifflin-St Jeor.
@@ -61,8 +64,8 @@ Front e API saem do mesmo domínio, então não existe configuração de CORS pa
 1. Entre em <https://neon.tech> e crie um projeto. Escolha a região mais perto (`South America (São Paulo)`).
 2. Em **SQL Editor**, cole todo o conteúdo de `db/schema.sql` e execute.
    Em bancos que já estavam rodando, aplique as migrações que ainda não rodou, **nesta ordem**:
-   `db/migracao-fibra.sql` e depois `db/migracao-porcoes.sql`. Todas podem ser rodadas
-   de novo sem causar problema.
+   `db/migracao-fibra.sql`, `db/migracao-porcoes.sql` e `db/migracao-meta-peso.sql`.
+   Todas podem ser rodadas de novo sem causar problema.
 3. Em **Connection string**, copie a opção **Pooled connection**. Ela se parece com:
 
    ```
@@ -122,6 +125,9 @@ cp .env.example .env    # preencha DATABASE_URL e JWT_SECRET
 npm run dev
 ```
 
+Arquivos em `api/` que começam com `_` (como `_local.js` e `_peso.js`) não são publicados como
+endpoints pela Vercel — é assim que ficam de fora módulos auxiliares.
+
 Sobe a API em `http://localhost:3001` e o app em `http://localhost:5173`, já com o
 encaminhamento de `/api` configurado. Como o Vite está com `host: true`, dá para abrir
 pelo celular na mesma rede usando o IP da sua máquina, por exemplo `http://192.168.0.10:5173`.
@@ -135,9 +141,10 @@ node test/run.mjs
 
 ```bash
 node test/migracao.mjs   # confere as migrações em sequência sobre um banco no formato original
+node test/peso.mjs       # lógica de tendência, ritmo e estimativa da meta de peso
 ```
 
-Sobe um Postgres de verdade em WebAssembly, aplica o `schema.sql` e roda 84 verificações:
+Sobe um Postgres de verdade em WebAssembly, aplica o `schema.sql` e roda 100 verificações:
 cálculo proporcional das porções, edição e remoção de registros, isolamento entre contas,
 hábitos, água, peso e as regras de segurança do login. Não precisa de banco externo.
 

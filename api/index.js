@@ -3,6 +3,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { neon } from '@neondatabase/serverless';
+import { analyzeGoal, directionOf } from './_peso.js';
 
 const sql = neon(process.env.DATABASE_URL);
 const JWT_SECRET = process.env.JWT_SECRET || 'troque-isto-em-producao';
@@ -78,6 +79,10 @@ function publicUser(u) {
       fiber: Number(u.target_fiber),
       water: Number(u.target_water),
     },
+    weightGoal:
+      u.target_weight === null || u.target_weight === undefined
+        ? null
+        : { target: Number(u.target_weight), startKg: Number(u.goal_start_kg) },
   };
 }
 
@@ -174,6 +179,62 @@ r.put(
     const hash = await bcrypt.hash(next, 10);
     await sql`update users set password_hash = ${hash} where id = ${req.uid}`;
     res.json({ ok: true });
+  })
+);
+
+/* --------------------------------------------------------- meta de peso */
+
+// Define, ajusta ou remove a meta. Aceita o peso atual junto, para quem ainda
+// não se pesou. Ajustar a meta na mesma direção mantém o ponto de partida,
+// então o progresso já feito não se perde.
+r.put(
+  '/weight-goal',
+  auth,
+  go(async (req, res) => {
+    const date = today();
+    const currentKg = num(req.body?.currentKg, null);
+    if (currentKg !== null) {
+      if (currentKg <= 0 || currentKg > 400) return res.status(400).json({ error: 'Peso atual inválido.' });
+      await sql`insert into weights (user_id, date, weight_kg) values (${req.uid}, ${date}, ${currentKg})
+        on conflict (user_id, date) do update set weight_kg = ${currentKg}`;
+    }
+
+    if (req.body?.target === null) {
+      const [u] = await sql`update users set target_weight = null, goal_start_kg = null,
+          goal_start_date = null where id = ${req.uid} returning *`;
+      return res.json({ user: publicUser(u) });
+    }
+
+    const target = num(req.body?.target, null);
+    if (target === null || target < 25 || target > 300)
+      return res.status(400).json({ error: 'Informe uma meta entre 25 e 300 kg.' });
+
+    const weights = await sql`
+      select to_char(date, 'YYYY-MM-DD') as date, weight_kg::float8 as kg
+      from weights where user_id = ${req.uid} order by date asc limit 400`;
+    if (!weights.length)
+      return res.status(400).json({ error: 'Anote seu peso atual para definir a meta.' });
+
+    const { series } = analyzeGoal(weights, null, null, date);
+    const now = series[series.length - 1].trend;
+
+    const [atual] = await sql`select target_weight, goal_start_kg from users where id = ${req.uid}`;
+    const keepStart =
+      atual.target_weight !== null &&
+      atual.goal_start_kg !== null &&
+      directionOf(Number(atual.target_weight), Number(atual.goal_start_kg)) ===
+        directionOf(target, Number(atual.goal_start_kg));
+    const startKg = keepStart ? Number(atual.goal_start_kg) : now;
+
+    // O objetivo do perfil acompanha a direção da meta.
+    const goal = directionOf(target, startKg);
+
+    const [u] = await sql`
+      update users set target_weight = ${target}, goal = ${goal},
+        goal_start_kg = ${startKg},
+        goal_start_date = case when ${keepStart} then goal_start_date else ${date}::date end
+      where id = ${req.uid} returning *`;
+    res.json({ user: publicUser(u) });
   })
 );
 
@@ -713,7 +774,7 @@ r.get(
     const days = Math.min(120, Math.max(7, Math.trunc(num(req.query.days, 14))));
     const from = localDate(Date.now() - (days - 1) * 86400000);
 
-    const [daily, water, weights, habits, logs] = await Promise.all([
+    const [daily, water, weights, habits, logs, [perfil]] = await Promise.all([
       sql`select to_char(date, 'YYYY-MM-DD') as date,
                  sum(kcal)::float8 as kcal, sum(protein)::float8 as protein,
                  sum(carbs)::float8 as carbs, sum(fat)::float8 as fat,
@@ -728,7 +789,20 @@ r.get(
           order by position, id`,
       sql`select habit_id, to_char(date, 'YYYY-MM-DD') as date from habit_logs
           where user_id = ${req.uid} and date >= current_date - 120`,
+      sql`select height_cm::float8 as height, target_weight::float8 as target,
+                 goal_start_kg::float8 as start_kg,
+                 to_char(goal_start_date, 'YYYY-MM-DD') as start_date
+          from users where id = ${req.uid}`,
     ]);
+
+    const peso = analyzeGoal(
+      weights,
+      perfil?.target === null || perfil?.target === undefined
+        ? null
+        : { target: perfil.target, startKg: perfil.start_kg, startDate: perfil.start_date },
+      perfil?.height || null,
+      today()
+    );
 
     const byDate = Object.fromEntries(daily.map((d) => [d.date, d]));
     const waterBy = Object.fromEntries(water.map((w) => [w.date, w.ml]));
@@ -776,7 +850,8 @@ r.get(
     res.json({
       days,
       series,
-      weights,
+      weights: peso.series,
+      weightGoal: peso.goal,
       habits: habitStats,
       averages: {
         kcal: logged.length ? Math.round(logged.reduce((a, s) => a + s.kcal, 0) / logged.length) : 0,

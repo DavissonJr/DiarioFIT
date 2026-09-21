@@ -17,6 +17,9 @@ create table if not exists users (
   target_fat     int  default 65,
   target_fiber   int  default 25,
   target_water   int  default 2000,
+  target_weight   numeric,  -- meta de peso (opcional)
+  goal_start_kg   numeric,  -- tendência de peso no dia em que a meta foi definida
+  goal_start_date date,
   created_at     timestamptz default now()
 );
 

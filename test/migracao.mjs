@@ -15,7 +15,10 @@ const antigo = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8'
   .replace(/  portion_qty   numeric,.*\n/, '')
   .replace(/  portion_label text,\n/g, '')
   .replace(/  portions      numeric,.*\n/, '')
-  .replace(/create index if not exists entries_user_meal_idx.*\n/, '');
+  .replace(/create index if not exists entries_user_meal_idx.*\n/, '')
+  .replace(/  target_weight   numeric,.*\n/, '')
+  .replace(/  goal_start_kg   numeric,.*\n/, '')
+  .replace(/  goal_start_date date,\n/, '');
 await db.exec(antigo);
 
 let falhas = 0;
@@ -79,6 +82,22 @@ check('registros antigos ficam como registros por peso', nulos.rows[0].n === 0);
 
 await db.exec(migPorcoes);
 check('rodar a migração de porções de novo é seguro', true);
+
+// ------------------------------------------------------ meta de peso
+const antesMeta = await db.query(`select column_name from information_schema.columns
+  where table_name = 'users' and column_name in ('target_weight','goal_start_kg','goal_start_date')`);
+check('antes da terceira migração não há colunas de meta', antesMeta.rows.length === 0, antesMeta.rows);
+
+const migMeta = readFileSync(new URL('../db/migracao-meta-peso.sql', import.meta.url), 'utf8');
+await db.exec(migMeta);
+const depoisMeta = await db.query(`select column_name from information_schema.columns
+  where table_name = 'users' and column_name in ('target_weight','goal_start_kg','goal_start_date')`);
+check('a migração de meta cria as três colunas', depoisMeta.rows.length === 3, depoisMeta.rows);
+
+const semMeta = await db.query('select target_weight from users where id = 1');
+check('usuários existentes começam sem meta', semMeta.rows[0].target_weight === null, semMeta.rows[0]);
+await db.exec(migMeta);
+check('rodar a migração de meta de novo é seguro', true);
 
 console.log(falhas ? `\n${falhas} falha(s).` : '\nMigrações validadas.');
 await db.close();

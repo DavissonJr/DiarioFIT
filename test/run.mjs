@@ -386,6 +386,61 @@ console.log('\nSugestões por refeição');
   check('recusa refeição inválida', invalida.status === 400);
 }
 
+
+console.log('\nMeta de peso');
+{
+  const anterior = token;
+  const nova = await call('/auth/register', {
+    method: 'POST',
+    body: { name: 'Carla', email: 'carla@teste.com', password: 'segredo123' },
+  });
+  token = nova.data.token;
+
+  const semPeso = await call('/weight-goal', { method: 'PUT', body: { target: 60 } });
+  check('sem nenhuma pesagem, pede o peso atual', semPeso.status === 400, semPeso.data);
+
+  const define = await call('/weight-goal', { method: 'PUT', body: { target: 60, currentKg: 66 } });
+  check('define a meta junto com o peso atual', define.status === 200 && define.data.user.weightGoal.target === 60, define.data);
+  check('o ponto de partida é o peso daquele momento', define.data.user.weightGoal.startKg === 66, define.data.user.weightGoal);
+  check('o objetivo do perfil vira "perder"', define.data.user.goal === 'perder', define.data.user.goal);
+  const pesos = await call('/weights');
+  check('o peso atual informado é anotado', pesos.data.weights.some((w) => w.date === iso() && w.kg === 66), pesos.data);
+
+  // Cinco semanas de histórico perdendo 0,5 kg por semana.
+  for (const [off, kg] of [[-35, 68.5], [-28, 68], [-21, 67.5], [-14, 67], [-7, 66.5]])
+    await call('/weights', { method: 'PUT', body: { date: iso(off), kg } });
+
+  const st = await call('/stats?days=14');
+  const g = st.data.weightGoal;
+  check('o resumo traz a análise da meta', g && g.target === 60 && g.direction === 'perder', g);
+  check('mede o ritmo real (~0,5 kg/semana)', Math.abs(g.ratePerWeek + 0.5) < 0.06, g.ratePerWeek);
+  check('estima uma data de chegada futura', g.etaStatus === 'ok' && g.eta > iso(), g);
+  check('cada pesagem vem com o valor de tendência', st.data.weights.every((w) => typeof w.trend === 'number'), st.data.weights);
+
+  const ajuste = await call('/weight-goal', { method: 'PUT', body: { target: 59 } });
+  check('ajustar na mesma direção mantém o ponto de partida', ajuste.data.user.weightGoal.startKg === 66, ajuste.data.user.weightGoal);
+
+  const inverte = await call('/weight-goal', { method: 'PUT', body: { target: 70 } });
+  check('inverter a direção recomeça do peso atual', inverte.data.user.weightGoal.startKg !== 66 && inverte.data.user.goal === 'ganhar', inverte.data.user);
+
+  const absurda = await call('/weight-goal', { method: 'PUT', body: { target: 10 } });
+  check('recusa meta fora de 25 a 300 kg', absurda.status === 400, absurda.data);
+
+  await call('/profile', { method: 'PUT', body: { heightCm: 165 } });
+  await call('/weight-goal', { method: 'PUT', body: { target: 48 } });
+  const baixa = await call('/stats?days=7');
+  check('meta abaixo de IMC 18,5 acende o aviso', baixa.data.weightGoal.lowBmi === true, baixa.data.weightGoal);
+
+  const remove = await call('/weight-goal', { method: 'PUT', body: { target: null } });
+  check('remove a meta', remove.data.user.weightGoal === null, remove.data.user);
+  const semMeta = await call('/stats?days=7');
+  check('sem meta, o resumo não traz análise', semMeta.data.weightGoal === null, semMeta.data.weightGoal);
+
+  token = anterior;
+  const outra = await call('/stats?days=7');
+  check('a meta de uma conta não aparece na outra', outra.data.weightGoal === null, outra.data.weightGoal);
+}
+
 console.log('\nIsolamento entre contas');
 {
   const other = await call('/auth/register', {

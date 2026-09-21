@@ -99,9 +99,16 @@ const server = app.listen(3001, async () => {
     await post('/entries', { foodId: f.id, date: iso(-i), meal: 'almoco', quantity: 120 + i * 9 }, token);
     await post('/entries', { foodId: r.id, date: iso(-i), meal: 'almoco', quantity: 300 + i * 22 }, token);
     await put('/water', { date: iso(-i), ml: 1500 + (i % 4) * 250 }, token);
-    if (i % 3 === 0) await put('/weights', { date: iso(-i), kg: 63.4 - i * 0.08 }, token);
   }
-  await put('/weights', { date: iso(), kg: 62.3 }, token);
+  // Oito semanas de pesagens a cada 3-4 dias: cai ~0,45 kg/semana com oscilação de água.
+  await put('/weights', { date: iso(-56), kg: 65.8 }, token);
+  await put('/weight-goal', { target: 58 }, token);
+  const ruido = [0.3, -0.2, 0.5, -0.1, 0.2, -0.4, 0.6, 0, -0.3, 0.4, -0.2, 0.1, 0.3, -0.1, 0.2, 0];
+  for (let k = 1; k <= 16; k++) {
+    const dia = -56 + Math.round(k * 3.5);
+    const kg = Math.round((65.8 - (0.45 / 7) * (56 + dia) + ruido[k - 1]) * 10) / 10;
+    await put('/weights', { date: iso(dia), kg }, token);
+  }
   await put('/water', { date: iso(), ml: 1250 }, token);
 
   const day = await fetch(base + `/day?date=${iso()}`, {

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n api,web -c green,cyan \"npm:api\" \"vite\"",
-    "api": "node --watch api/local.js",
+    "api": "node --watch api/_local.js",
     "build": "vite build",
     "preview": "vite preview"
   },
