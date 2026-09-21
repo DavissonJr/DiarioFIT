@@ -34,6 +34,8 @@ create table if not exists foods (
   carbs     numeric not null default 0,
   fat       numeric not null default 0,
   fiber     numeric not null default 0,
+  portion_qty   numeric,   -- medida caseira opcional: 1 "portion_label" = portion_qty g/ml
+  portion_label text,
   favorite  boolean not null default false,
   created_at timestamptz default now()
 );
@@ -55,6 +57,8 @@ create table if not exists entries (
   carbs    numeric not null default 0,
   fat      numeric not null default 0,
   fiber    numeric not null default 0,
+  portions      numeric,   -- quantas medidas caseiras, quando registrado por unidade
+  portion_label text,
   created_at timestamptz default now()
 );
 create index if not exists entries_user_date_idx on entries(user_id, date);
@@ -100,3 +104,6 @@ create table if not exists notes (
   body    text,
   primary key (user_id, date)
 );
+
+-- Acelera as sugestões por refeição.
+create index if not exists entries_user_meal_idx on entries(user_id, meal, date);

@@ -273,6 +273,119 @@ console.log('\nResumo');
   check('média considera só dias anotados', s.data.averages.daysLogged >= 1, s.data.averages);
 }
 
+
+console.log('\nRegistro por unidade (medida caseira)');
+{
+  const r = await call('/foods', {
+    method: 'POST',
+    body: { name: 'Ovo teste', baseQty: 100, unit: 'g', kcal: 146, protein: 13.3, carbs: 0.6,
+            fat: 9.5, portionQty: 50, portionLabel: 'ovo' },
+  });
+  const ovo = r.data.food;
+  check('guarda a medida caseira do alimento', ovo.portionQty === 50 && ovo.portionLabel === 'ovo', ovo);
+
+  const semRotulo = await call('/foods', {
+    method: 'POST',
+    body: { name: 'Biscoito teste', baseQty: 100, unit: 'g', kcal: 380, portionQty: 7.5 },
+  });
+  check('rótulo padrão "unidade" quando não informado', semRotulo.data.food.portionLabel === 'unidade', semRotulo.data.food);
+
+  const un = await call('/foods', {
+    method: 'POST',
+    body: { name: 'Pão teste', baseQty: 1, unit: 'un', kcal: 150, portionQty: 50 },
+  });
+  check('alimento por unidade ignora medida caseira', un.data.food.portionQty === null, un.data.food);
+
+  const d = iso(5);
+  const add = await call('/entries', {
+    method: 'POST',
+    body: { foodId: ovo.id, date: d, meal: 'cafe', portions: 3 },
+  });
+  check('registra 3 ovos de uma vez', add.status === 201, add.data);
+  let day = await call(`/day?date=${d}`);
+  let e = day.data.entries[0];
+  check('3 × 50 g = 150 g calculado no servidor', e.quantity === 150, e);
+  check('3 ovos = 219 kcal', e.kcal === 219, e);
+  check('o registro lembra que foram 3 ovos', e.portions === 3 && e.portionLabel === 'ovo', e);
+
+  // O cliente não consegue impor um total diferente do que as unidades dão.
+  const burla = await call('/entries', {
+    method: 'POST',
+    body: { foodId: ovo.id, date: d, meal: 'cafe', portions: 1, quantity: 999 },
+  });
+  day = await call(`/day?date=${d}`);
+  const burlado = day.data.entries.find((x) => x.id === burla.data.id);
+  check('unidades prevalecem sobre quantidade enviada junto', burlado.quantity === 50, burlado);
+  await call(`/entries/${burla.data.id}`, { method: 'DELETE' });
+
+  await call(`/entries/${e.id}`, { method: 'PUT', body: { portions: 2 } });
+  day = await call(`/day?date=${d}`);
+  e = day.data.entries[0];
+  check('editar para 2 ovos recalcula para 100 g', e.quantity === 100 && e.portions === 2, e);
+
+  await call(`/entries/${e.id}`, { method: 'PUT', body: { quantity: 80 } });
+  day = await call(`/day?date=${d}`);
+  e = day.data.entries[0];
+  check('trocar para gramas limpa as unidades', e.quantity === 80 && e.portions === null, e);
+
+  const semMedida = await call('/entries', {
+    method: 'POST',
+    body: { foodId: un.data.food.id, date: d, meal: 'cafe', portions: 2 },
+  });
+  check('recusa unidades em alimento sem medida caseira', semMedida.status === 400, semMedida.data);
+
+  const zero = await call('/entries', {
+    method: 'POST',
+    body: { foodId: ovo.id, date: d, meal: 'cafe', portions: 0 },
+  });
+  check('recusa zero unidades', zero.status === 400, zero.data);
+
+  // Com o alimento apagado, a proporção guardada no registro continua valendo.
+  await call(`/entries/${e.id}`, { method: 'PUT', body: { portions: 2 } });
+  await call(`/foods/${ovo.id}`, { method: 'DELETE' });
+  await call(`/entries/${e.id}`, { method: 'PUT', body: { portions: 4 } });
+  day = await call(`/day?date=${d}`);
+  e = day.data.entries[0];
+  check('alimento apagado: 4 ovos ainda viram 200 g', e.quantity === 200 && e.kcal === 292, e);
+
+  const cp = await call('/entries/copy', { method: 'POST', body: { ids: [e.id], to: iso(6) } });
+  const copiado = (await call(`/day?date=${iso(6)}`)).data.entries[0];
+  check('copiar de outro dia preserva as unidades', cp.data.copied === 1 && copiado.portions === 4 && copiado.portionLabel === 'ovo', copiado);
+}
+
+console.log('\nSugestões por refeição');
+{
+  const leite = (await call('/foods', { method: 'POST', body: { name: 'Leite teste', baseQty: 100, unit: 'ml', kcal: 42 } })).data.food;
+  const chia = (await call('/foods', { method: 'POST', body: { name: 'Chia teste', baseQty: 100, unit: 'g', kcal: 490 } })).data.food;
+  const bolo = (await call('/foods', { method: 'POST', body: { name: 'Bolo teste', baseQty: 100, unit: 'g', kcal: 350 } })).data.food;
+
+  // Leite no café 3 vezes (200, 200, 300 ml); chia 2 vezes; bolo só 1 vez; leite 2 vezes na ceia.
+  const plano = [
+    [leite, -20, 'cafe', 200], [leite, -21, 'cafe', 200], [leite, -22, 'cafe', 300],
+    [chia, -20, 'cafe', 15], [chia, -23, 'cafe', 15],
+    [bolo, -20, 'cafe', 80],
+    [leite, -20, 'ceia', 150], [leite, -21, 'ceia', 150],
+  ];
+  for (const [f, off, meal, q] of plano)
+    await call('/entries', { method: 'POST', body: { foodId: f.id, date: iso(off), meal, quantity: q } });
+
+  const cafe = await call('/foods/suggestions?meal=cafe');
+  const nomes = cafe.data.suggestions.map((x) => x.food.name);
+  check('sugere o que é comum no café', nomes.includes('Leite teste') && nomes.includes('Chia teste'), nomes);
+  check('não sugere o que apareceu uma vez só', !nomes.includes('Bolo teste'), nomes);
+  check('o mais frequente vem primeiro', nomes[0] === 'Leite teste', nomes);
+  const s0 = cafe.data.suggestions[0];
+  check('traz a quantidade de costume (200 ml, não 300)', s0.quantity === 200 && s0.uses === 3, s0);
+
+  const ceia = await call('/foods/suggestions?meal=ceia');
+  const sc = ceia.data.suggestions.find((x) => x.food.name === 'Leite teste');
+  check('cada refeição tem sua própria quantidade de costume', sc && sc.quantity === 150, ceia.data.suggestions);
+  check('ceia não herda sugestões do café', !ceia.data.suggestions.some((x) => x.food.name === 'Chia teste'), ceia.data.suggestions);
+
+  const invalida = await call('/foods/suggestions?meal=lanchinho');
+  check('recusa refeição inválida', invalida.status === 400);
+}
+
 console.log('\nIsolamento entre contas');
 {
   const other = await call('/auth/register', {
@@ -287,6 +400,9 @@ console.log('\nIsolamento entre contas');
 
   const day = await call(`/day?date=${iso()}`);
   check('a outra conta não vê o dia alheio', day.data.totals.kcal === 0, day.data.totals);
+
+  const sug = await call('/foods/suggestions?meal=cafe');
+  check('a outra conta não recebe sugestões alheias', sug.data.suggestions.length === 0, sug.data);
 
   const steal = await call(`/entries/${1}`, { method: 'PUT', body: { quantity: 5 } });
   check('não edita registro de outra conta', steal.status === 404, steal.data);

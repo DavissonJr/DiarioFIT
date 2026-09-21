@@ -25,7 +25,7 @@ export default function Fab({ onClick, label }) {
       onClick={onClick}
       aria-label={label}
       className={`fixed bottom-[88px] right-4 z-30 grid h-14 w-14 place-items-center rounded-full
-        bg-leaf-500 text-white shadow-lift transition duration-300 active:scale-95
+        bg-brand-500 text-on-brand shadow-lift transition duration-300 active:scale-95
         md:bottom-8 md:right-8 md:h-16 md:w-16
         ${hidden ? 'pointer-events-none translate-y-[160%] opacity-0' : ''}`}
     >

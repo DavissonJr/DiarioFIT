@@ -64,15 +64,28 @@ const server = app.listen(3001, async () => {
     targets: { kcal: 1850, protein: 115, carbs: 190, fat: 55, water: 2200 },
   }, token);
 
+  // Alimento com medida caseira, para registrar por unidade.
+  const { food: biscoito } = await post('/foods', {
+    name: 'Biscoito de arroz', baseQty: 100, unit: 'g', kcal: 380, protein: 8,
+    carbs: 80, fat: 3, fiber: 3, portionQty: 7.5, portionLabel: 'biscoito',
+  }, token);
+  await post('/entries', { foodId: biscoito.id, date: iso(), meal: 'cafe', portions: 3 }, token);
+
+  // Histórico de café da manhã: vira sugestão.
+  for (let i = 1; i <= 8; i++) {
+    await post('/entries', { foodId: find('Aveia').id, date: iso(-i), meal: 'cafe', quantity: 40 }, token);
+    await post('/entries', { foodId: find('Leite integral').id, date: iso(-i), meal: 'cafe', quantity: 200 }, token);
+    if (i % 2) await post('/entries', { foodId: find('Iogurte').id, date: iso(-i), meal: 'cafe', quantity: 170 }, token);
+    if (i % 3 === 0) await post('/entries', { foodId: biscoito.id, date: iso(-i), meal: 'cafe', portions: 2 }, token);
+  }
+
   const plan = [
-    ['Aveia', 40, 'cafe'],
-    ['Leite integral', 200, 'cafe'],
     ['Banana', 90, 'cafe'],
     ['Arroz', 120, 'almoco'],
     ['Feijão', 90, 'almoco'],
     ['Peito de frango', 170, 'almoco'],
     ['Brócolis', 80, 'almoco'],
-    ['Iogurte', 170, 'lanche'],
+    ['Maçã', 130, 'lanche'],
   ];
   for (const [name, q, meal] of plan) {
     const f = find(name);

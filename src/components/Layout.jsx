@@ -15,11 +15,11 @@ export default function Layout({ children }) {
       <nav className="sticky top-0 hidden h-[100dvh] w-[232px] shrink-0 flex-col border-r border-line bg-surface px-4 py-6 md:flex">
         <div className="mb-8 flex items-center gap-2.5 px-2">
           <svg viewBox="0 0 512 512" className="h-9 w-9" aria-hidden="true">
-            <rect width="512" height="512" rx="120" fill="#1F6B47" />
-            <circle cx="256" cy="286" r="132" fill="none" stroke="#EAF3ED" strokeWidth="26" />
-            <path d="M256 288c0-54 36-94 88-101 5 52-29 97-88 101z" fill="#EAF3ED" />
-            <path d="M256 288c0-40-26-70-64-76-4 39 20 72 64 76z" fill="#A9CDB8" />
-            <rect x="245" y="288" width="22" height="106" rx="11" fill="#EAF3ED" />
+            <rect width="512" height="512" rx="120" className="fill-brand-500" />
+            <circle cx="256" cy="286" r="132" fill="none" className="stroke-brand-50" strokeWidth="26" />
+            <path d="M256 288c0-54 36-94 88-101 5 52-29 97-88 101z" className="fill-brand-50" />
+            <path d="M256 288c0-40-26-70-64-76-4 39 20 72 64 76z" className="fill-brand-200" />
+            <rect x="245" y="288" width="22" height="106" rx="11" className="fill-brand-50" />
           </svg>
           <span className="font-display text-xl font-semibold">Diário</span>
         </div>
@@ -32,7 +32,7 @@ export default function Layout({ children }) {
               end={end}
               className={({ isActive }) =>
                 `flex items-center gap-3 rounded-2xl px-3 py-3 font-semibold transition ${
-                  isActive ? 'bg-leaf-50 text-leaf-600' : 'text-mute hover:bg-canvas hover:text-ink'
+                  isActive ? 'bg-brand-50 text-brand-600' : 'text-mute hover:bg-canvas hover:text-ink'
                 }`
               }
             >
@@ -57,7 +57,7 @@ export default function Layout({ children }) {
               end={end}
               className={({ isActive }) =>
                 `flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-semibold transition ${
-                  isActive ? 'text-leaf-500' : 'text-mute'
+                  isActive ? 'text-brand-500' : 'text-mute'
                 }`
               }
             >
@@ -65,7 +65,7 @@ export default function Layout({ children }) {
                 <>
                   <span
                     className={`grid h-8 w-14 place-items-center rounded-full transition ${
-                      isActive ? 'bg-leaf-50' : ''
+                      isActive ? 'bg-brand-50' : ''
                     }`}
                   >
                     <Icon size={21} strokeWidth={isActive ? 2.4 : 2} />

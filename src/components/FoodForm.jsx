@@ -4,6 +4,9 @@ import { api } from '../lib/api';
 import { UNITS, parseNum, n0 } from '../lib/nutri';
 import { Sheet, Button, Field, ErrorNote, toast } from './ui';
 
+// Mostra decimais com vírgula ao editar (3.2 → 3,2); a leitura aceita os dois.
+const br = (v) => (v === null || v === undefined ? '' : String(v).replace('.', ','));
+
 const EMPTY = {
   name: '',
   brand: '',
@@ -14,6 +17,8 @@ const EMPTY = {
   carbs: '',
   fat: '',
   fiber: '',
+  portionQty: '',
+  portionLabel: '',
 };
 
 export default function FoodForm({ open, food, onClose, onSaved, onDeleted }) {
@@ -30,13 +35,15 @@ export default function FoodForm({ open, food, onClose, onSaved, onDeleted }) {
         ? {
             name: food.name || '',
             brand: food.brand || '',
-            baseQty: String(food.baseQty ?? 100),
+            baseQty: br(food.baseQty ?? 100),
             unit: food.unit || 'g',
-            kcal: String(food.kcal ?? ''),
-            protein: String(food.protein ?? ''),
-            carbs: String(food.carbs ?? ''),
-            fat: String(food.fat ?? ''),
-            fiber: String(food.fiber ?? ''),
+            kcal: br(food.kcal),
+            protein: br(food.protein),
+            carbs: br(food.carbs),
+            fat: br(food.fat),
+            fiber: br(food.fiber),
+            portionQty: food.portionQty ? br(food.portionQty) : '',
+            portionLabel: food.portionLabel || '',
           }
         : EMPTY
     );
@@ -59,6 +66,8 @@ export default function FoodForm({ open, food, onClose, onSaved, onDeleted }) {
         carbs: parseNum(form.carbs),
         fat: parseNum(form.fat),
         fiber: parseNum(form.fiber),
+        portionQty: form.unit !== 'un' && parseNum(form.portionQty) > 0 ? parseNum(form.portionQty) : null,
+        portionLabel: form.portionLabel,
         favorite: !!food?.favorite,
       };
       const data = editing
@@ -167,6 +176,36 @@ export default function FoodForm({ open, food, onClose, onSaved, onDeleted }) {
           </p>
         </div>
 
+        {form.unit !== 'un' && (
+          <div className="rounded-2xl border border-dashed border-line p-4">
+            <p className="text-sm font-semibold">Medida caseira (opcional)</p>
+            <p className="mt-0.5 text-xs text-mute">
+              Preencha para registrar por unidade, como “3 ovos” ou “2 biscoitos”, sem pesar.
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <span className="font-display text-lg text-mute">1</span>
+              <input
+                className="field min-w-0 flex-1"
+                value={form.portionLabel}
+                onChange={set('portionLabel')}
+                placeholder="ex.: fatia"
+                maxLength={24}
+                aria-label="Nome da medida caseira"
+              />
+              <span className="text-mute">=</span>
+              <input
+                className="field tnum w-20"
+                value={form.portionQty}
+                onChange={set('portionQty')}
+                inputMode="decimal"
+                placeholder="50"
+                aria-label="Tamanho da medida caseira"
+              />
+              <span className="text-mute">{form.unit}</span>
+            </div>
+          </div>
+        )}
+
         <Field label={`Calorias em ${form.baseQty || 0} ${unitLabel}`}>
           <input
             className="field tnum"
@@ -178,15 +217,15 @@ export default function FoodForm({ open, food, onClose, onSaved, onDeleted }) {
         </Field>
 
         <div className="grid grid-cols-3 gap-3">
-          {macroField('protein', 'Proteína (g)', 'text-prot')}
           {macroField('carbs', 'Carboidrato (g)', 'text-carb')}
+          {macroField('protein', 'Proteína (g)', 'text-prot')}
           {macroField('fat', 'Gordura (g)', 'text-fat')}
         </div>
 
         {macroField('fiber', 'Fibra (g), opcional', '')}
 
         {parseNum(form.kcal) > 0 && parseNum(form.baseQty) > 0 && (
-          <p className="rounded-2xl bg-leaf-50 px-4 py-3 text-sm text-leaf-600">
+          <p className="rounded-2xl bg-brand-50 px-4 py-3 text-sm text-brand-600">
             Cada {form.baseQty} {unitLabel} vai contar como{' '}
             <strong className="tnum">{n0(parseNum(form.kcal))} kcal</strong>.
           </p>

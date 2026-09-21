@@ -32,11 +32,11 @@ export default function Login() {
       <div className="mx-auto w-full max-w-sm">
         <header className="mb-8">
           <svg viewBox="0 0 512 512" className="mb-5 h-12 w-12" aria-hidden="true">
-            <rect width="512" height="512" rx="120" fill="#1F6B47" />
-            <circle cx="256" cy="286" r="132" fill="none" stroke="#EAF3ED" strokeWidth="26" />
-            <path d="M256 288c0-54 36-94 88-101 5 52-29 97-88 101z" fill="#EAF3ED" />
-            <path d="M256 288c0-40-26-70-64-76-4 39 20 72 64 76z" fill="#A9CDB8" />
-            <rect x="245" y="288" width="22" height="106" rx="11" fill="#EAF3ED" />
+            <rect width="512" height="512" rx="120" className="fill-brand-500" />
+            <circle cx="256" cy="286" r="132" fill="none" className="stroke-brand-50" strokeWidth="26" />
+            <path d="M256 288c0-54 36-94 88-101 5 52-29 97-88 101z" className="fill-brand-50" />
+            <path d="M256 288c0-40-26-70-64-76-4 39 20 72 64 76z" className="fill-brand-200" />
+            <rect x="245" y="288" width="22" height="106" rx="11" className="fill-brand-50" />
           </svg>
           <h1 className="font-display text-[34px] font-semibold leading-[1.1] tracking-tight">
             {creating ? 'Vamos começar' : 'Bom te ver de novo'}
@@ -108,7 +108,7 @@ export default function Login() {
               setMode(creating ? 'login' : 'create');
               setError('');
             }}
-            className="font-semibold text-leaf-500 underline underline-offset-4"
+            className="font-semibold text-brand-500 underline underline-offset-4"
           >
             {creating ? 'Entrar' : 'Criar agora'}
           </button>

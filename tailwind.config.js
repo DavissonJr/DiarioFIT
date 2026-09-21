@@ -1,28 +1,41 @@
 /** @type {import('tailwindcss').Config} */
+
+// Cada cor vem de uma variável CSS definida por tema em src/index.css.
+// O formato "rgb(var(--x) / <alpha-value>)" mantém funcionando bg-ink/40, text-mute/60 etc.
+const v = (name) => `rgb(var(--${name}) / <alpha-value>)`;
+
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
       colors: {
-        canvas: '#EFF2ED',
-        surface: '#FFFFFF',
-        ink: '#16221C',
-        mute: '#61706A',
-        line: '#DDE4DC',
-        leaf: {
-          50: '#EAF3ED',
-          100: '#D3E7DB',
-          200: '#A9CDB8',
-          400: '#3E8A63',
-          500: '#1F6B47',
-          600: '#18573A',
-          700: '#12412B',
+        canvas: v('canvas'),
+        surface: v('surface'),
+        ink: v('ink'),
+        mute: v('mute'),
+        line: v('line'),
+        'on-brand': v('on-brand'),
+        brand: {
+          50: v('brand-50'),
+          100: v('brand-100'),
+          200: v('brand-200'),
+          400: v('brand-400'),
+          500: v('brand-500'),
+          600: v('brand-600'),
+          700: v('brand-700'),
         },
-        prot: '#C0553F',
-        carb: '#D9A036',
-        fat: '#6E7FB8',
-        fiber: '#7A8C4E',
-        water: '#3E86A0',
+        prot: v('prot'),
+        carb: v('carb'),
+        fat: v('fat'),
+        fiber: v('fiber'),
+        water: v('water'),
+        meal: {
+          cafe: v('meal-cafe'),
+          almoco: v('meal-almoco'),
+          lanche: v('meal-lanche'),
+          jantar: v('meal-jantar'),
+          ceia: v('meal-ceia'),
+        },
       },
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
@@ -30,8 +43,8 @@ export default {
       },
       borderRadius: { xl2: '1.25rem' },
       boxShadow: {
-        card: '0 1px 2px rgba(22,34,28,.05), 0 8px 24px -16px rgba(22,34,28,.28)',
-        lift: '0 -8px 40px -12px rgba(22,34,28,.35)',
+        card: '0 1px 2px rgb(var(--shadow) / .06), 0 8px 24px -16px rgb(var(--shadow) / .30)',
+        lift: '0 -8px 40px -12px rgb(var(--shadow) / .40)',
       },
       keyframes: {
         rise: { from: { transform: 'translateY(16px)', opacity: '0' }, to: { transform: 'none', opacity: '1' } },

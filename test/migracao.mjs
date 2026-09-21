@@ -7,10 +7,15 @@ import { readFileSync } from 'node:fs';
 
 const db = new PGlite();
 
-// Reconstrói o schema ANTIGO: sem users.target_fiber e sem entries.fiber.
+// Reconstrói o schema ORIGINAL, anterior às duas migrações:
+// sem fibra e sem medida caseira.
 const antigo = readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8')
   .replace('  target_fiber   int  default 25,\n', '')
-  .replace('  fiber    numeric not null default 0,\n', '');
+  .replace('  fiber    numeric not null default 0,\n', '')
+  .replace(/  portion_qty   numeric,.*\n/, '')
+  .replace(/  portion_label text,\n/g, '')
+  .replace(/  portions      numeric,.*\n/, '')
+  .replace(/create index if not exists entries_user_meal_idx.*\n/, '');
 await db.exec(antigo);
 
 let falhas = 0;
@@ -53,6 +58,28 @@ await db.exec(readFileSync(new URL('../db/migracao-fibra.sql', import.meta.url),
 const dePois = await db.query('select fiber::float8 as fiber from entries where id = 1');
 check('rodar a migração de novo é seguro', dePois.rows[0].fiber === 5, dePois.rows[0]);
 
-console.log(falhas ? `\n${falhas} falha(s).` : '\nMigração validada.');
+// ---------------------------------------------------------- porções
+const semPorcao = await db.query(`select column_name from information_schema.columns
+  where table_name in ('foods','entries') and column_name like 'portion%'`);
+check('antes da segunda migração não há colunas de porção', semPorcao.rows.length === 0, semPorcao.rows);
+
+const migPorcoes = readFileSync(new URL('../db/migracao-porcoes.sql', import.meta.url), 'utf8');
+await db.exec(migPorcoes);
+
+const porcao = await db.query(`select table_name, column_name from information_schema.columns
+  where (table_name = 'foods' and column_name in ('portion_qty','portion_label'))
+     or (table_name = 'entries' and column_name in ('portions','portion_label'))`);
+check('a migração de porções cria as quatro colunas', porcao.rows.length === 4, porcao.rows);
+
+const intactos = await db.query('select count(*)::int as n, sum(fiber)::float8 as fib from entries');
+check('registros existentes continuam intactos', intactos.rows[0].n === 3 && intactos.rows[0].fib === 5, intactos.rows[0]);
+
+const nulos = await db.query('select count(*)::int as n from entries where portions is not null');
+check('registros antigos ficam como registros por peso', nulos.rows[0].n === 0);
+
+await db.exec(migPorcoes);
+check('rodar a migração de porções de novo é seguro', true);
+
+console.log(falhas ? `\n${falhas} falha(s).` : '\nMigrações validadas.');
 await db.close();
 process.exit(falhas ? 1 : 0);

@@ -2,6 +2,16 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Aplica o tema salvo antes da primeira pintura, para não piscar a cor errada.
+      (function () {
+        try {
+          var t = localStorage.getItem('diario_tema') || 'verde';
+          if (t === 'auto') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'verde';
+          document.documentElement.dataset.theme = t;
+        } catch (e) {}
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
     <title>Diário</title>
     <meta name="description" content="Diário de alimentação, água e hábitos." />

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, CopyPlus, Check, Droplet, Minus } from 'lucide-react';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { todayISO, addDays, dateLabel, MEALS, mealNow, n0, n1, qty } from '../lib/nutri';
+import { todayISO, addDays, dateLabel, MEALS, mealNow, n0, n1, amountText } from '../lib/nutri';
+import MealIcon from '../components/MealIcon';
 import { Button, DayBar, MacroBar, Loading, ErrorNote, Empty, toast } from '../components/ui';
 import AddEntry from '../components/AddEntry';
 import Fab from '../components/Fab';
@@ -89,7 +90,7 @@ export default function Today() {
           {!isToday && (
             <button
               onClick={() => setDate(todayISO())}
-              className="text-xs font-semibold text-leaf-500"
+              className="text-xs font-semibold text-brand-500"
             >
               voltar para hoje
             </button>
@@ -141,6 +142,8 @@ export default function Today() {
                 segments={MEALS.map((m) => ({
                   id: m.id,
                   label: m.label,
+                  short: m.short,
+                  color: m.dot,
                   kcal: day.entries
                     .filter((e) => e.meal === m.id)
                     .reduce((a, e) => a + e.kcal, 0),
@@ -150,16 +153,16 @@ export default function Today() {
 
             <div className="mt-5 space-y-3">
               <MacroBar
-                label="Proteína"
-                value={totals.protein}
-                target={targets.protein}
-                colorClass="bg-prot"
-              />
-              <MacroBar
                 label="Carboidrato"
                 value={totals.carbs}
                 target={targets.carbs}
                 colorClass="bg-carb"
+              />
+              <MacroBar
+                label="Proteína"
+                value={totals.protein}
+                target={targets.protein}
+                colorClass="bg-prot"
               />
               <MacroBar
                 label="Gordura"
@@ -237,7 +240,7 @@ export default function Today() {
                       >
                         <span
                           className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 transition
-                            ${h.done ? 'animate-pop border-leaf-500 bg-leaf-500 text-white' : 'border-line'}`}
+                            ${h.done ? 'animate-pop border-brand-500 bg-brand-500 text-on-brand' : 'border-line'}`}
                         >
                           {h.done && <Check size={16} strokeWidth={3} />}
                         </span>
@@ -282,21 +285,29 @@ export default function Today() {
               const kcal = items.reduce((a, e) => a + e.kcal, 0);
 
               return (
-                <div key={m.id} className="border-b border-line last:border-0">
-                  <div className="flex items-center justify-between px-5 pb-1 pt-4">
-                    <h3 className="font-display text-lg font-semibold">{m.label}</h3>
-                    <div className="flex items-center gap-1">
+                <div key={m.id} className="relative border-b border-line last:border-0">
+                  <span
+                    className={`absolute bottom-4 left-0 top-4 w-1 rounded-r-full ${m.dot}`}
+                    aria-hidden="true"
+                  />
+                  <div className="flex items-center justify-between gap-3 px-5 pb-1 pt-4">
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <MealIcon meal={m.id} />
+                      <h3 className="truncate font-display text-lg font-semibold">{m.label}</h3>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
                       {kcal > 0 && (
-                        <span className="tnum mr-1 text-sm text-mute">{n0(kcal)} kcal</span>
+                        <span className={`tnum text-sm font-semibold ${m.text}`}>
+                          {n0(kcal)} kcal
+                        </span>
                       )}
-                      <Button
-                        variant="soft"
-                        size="iconSm"
+                      <button
                         onClick={() => setAdding({ meal: m.id })}
                         aria-label={`Adicionar em ${m.label}`}
+                        className={`grid h-9 w-9 place-items-center rounded-full transition active:scale-95 ${m.soft} ${m.text}`}
                       >
-                        <Plus size={18} />
-                      </Button>
+                        <Plus size={18} strokeWidth={2.4} />
+                      </button>
                     </div>
                   </div>
 
@@ -313,8 +324,10 @@ export default function Today() {
                             <div className="min-w-0 flex-1">
                               <p className="truncate font-medium">{e.name}</p>
                               <p className="tnum text-sm text-mute">
-                                {qty(e.quantity)} {e.unit === 'un' ? 'un' : e.unit} ·{' '}
-                                {n1(e.protein)} P · {n1(e.carbs)} C · {n1(e.fat)} G
+                                <span className={e.portions ? 'font-medium text-ink/80' : ''}>
+                                  {amountText(e)}
+                                </span>{' '}
+                                · {n1(e.carbs)} C · {n1(e.protein)} P · {n1(e.fat)} G
                               </p>
                             </div>
                             <span className="tnum shrink-0 font-display font-semibold">
@@ -339,7 +352,7 @@ export default function Today() {
                   key={m}
                   onClick={() => saveNote(day.note?.mood === m ? null : m)}
                   className={`rounded-full px-4 py-2 text-sm font-semibold transition active:scale-[.97] ${
-                    day.note?.mood === m ? 'bg-leaf-500 text-white' : 'bg-canvas text-mute'
+                    day.note?.mood === m ? 'bg-brand-500 text-on-brand' : 'bg-canvas text-mute'
                   }`}
                 >
                   {m}
@@ -377,6 +390,7 @@ export default function Today() {
         date={date}
         meal={adding?.meal}
         entry={adding?.entry}
+        dayEntries={day?.entries || []}
         onClose={() => setAdding(null)}
         onSaved={load}
       />

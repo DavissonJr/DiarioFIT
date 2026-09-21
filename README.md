@@ -11,8 +11,14 @@ Feito para funcionar bem no celular e no tablet, com instalação na tela de in�
 
 - **Diário do dia** por refeição, com cálculo automático a partir da medida base
   (100 g, 100 ml ou unidade). Registrar 170 g de um frango de 159 kcal/100 g grava 270 kcal.
-- **Alimentos** com nome, marca, medida base, calorias, proteína, carboidrato, gordura e fibra.
+- **Alimentos** com nome, marca, medida base, calorias, carboidrato, proteína, gordura e fibra.
   Favoritos e busca sem acento.
+- **Registro por unidade**: com a medida caseira cadastrada (1 ovo = 50 g, 1 biscoito = 7,5 g),
+  basta tocar `+` três vezes para anotar 3 ovos, sem pesar.
+- **Sugestões por refeição**: ao abrir o café da manhã, aparece o que ela costuma comer
+  nele, já com a quantidade de sempre. O `+` anota na hora e a folha continua aberta.
+- **Cores por refeição** no resumo do dia, nas seções e na escolha da refeição.
+- **Temas**: Verde, Oceano, Rosa, Escuro e Automático (acompanha o modo do celular).
 - **Fibra** com meta própria, somada junto dos outros nutrientes.
 - **Água** em copos de 250 ml.
 - **Hábitos** com dias da semana escolhidos, marcação diária e sequência de dias seguidos.
@@ -54,9 +60,9 @@ Front e API saem do mesmo domínio, então não existe configuração de CORS pa
 
 1. Entre em <https://neon.tech> e crie um projeto. Escolha a região mais perto (`South America (São Paulo)`).
 2. Em **SQL Editor**, cole todo o conteúdo de `db/schema.sql` e execute.
-   Em bancos que já estavam rodando antes da fibra, rode também `db/migracao-fibra.sql`
-   (ela cria as colunas novas e preenche a fibra dos registros antigos; rodar duas vezes
-   não causa problema).
+   Em bancos que já estavam rodando, aplique as migrações que ainda não rodou, **nesta ordem**:
+   `db/migracao-fibra.sql` e depois `db/migracao-porcoes.sql`. Todas podem ser rodadas
+   de novo sem causar problema.
 3. Em **Connection string**, copie a opção **Pooled connection**. Ela se parece com:
 
    ```
@@ -128,10 +134,10 @@ node test/run.mjs
 ```
 
 ```bash
-node test/migracao.mjs   # confere a migração de fibra sobre um banco no formato antigo
+node test/migracao.mjs   # confere as migrações em sequência sobre um banco no formato original
 ```
 
-Sobe um Postgres de verdade em WebAssembly, aplica o `schema.sql` e roda 62 verificações:
+Sobe um Postgres de verdade em WebAssembly, aplica o `schema.sql` e roda 84 verificações:
 cálculo proporcional das porções, edição e remoção de registros, isolamento entre contas,
 hábitos, água, peso e as regras de segurança do login. Não precisa de banco externo.
 
@@ -151,8 +157,10 @@ resolve isso; o front sempre manda a data local junto.
 metabolismo basal estimado, e o servidor recusa metas abaixo de 1000 kcal. Passar da meta
 não gera nenhum alerta vermelho no app — a tela fica neutra, de propósito.
 
-**Trocar o idioma dos textos, cores ou fontes.** As cores e as fontes estão todas em
-`tailwind.config.js`. Os textos ficam nos próprios componentes, em português.
+**Temas e cores.** Cada tema é um bloco de variáveis em `src/index.css`. Para criar um novo,
+copie um bloco `[data-theme='...']`, ajuste os valores RGB e acrescente a opção em
+`src/lib/theme.js`. Evite nomes de cor que colidam com utilitários do Tailwind
+(`base`, `sm`, `lg`, `full`) — já custou um bug aqui.
 
 ---
 

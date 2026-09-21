@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, ChevronRight, Check, CopyPlus } from 'lucide-react';
 import { api } from '../lib/api';
-import { addDays, dateLabel, todayISO, MEALS, n0, qty } from '../lib/nutri';
+import { addDays, dateLabel, todayISO, MEALS, n0, amountText } from '../lib/nutri';
+import MealIcon from './MealIcon';
 import { Sheet, Button, Loading, Empty, ErrorNote, toast } from './ui';
 
 /**
@@ -142,10 +143,13 @@ export default function ImportDay({ open, date, onClose, onImported }) {
             return (
               <div key={m.id} className="mb-4 first:mt-1">
                 <div className="mb-1 flex items-center justify-between">
-                  <h3 className="font-display text-base font-semibold">{m.label}</h3>
+                  <div className="flex items-center gap-2">
+                    <MealIcon meal={m.id} size="sm" />
+                    <h3 className={`font-display text-base font-semibold ${m.text}`}>{m.label}</h3>
+                  </div>
                   <button
                     onClick={() => toggleMeal(items)}
-                    className="text-sm font-semibold text-leaf-500"
+                    className="text-sm font-semibold text-brand-500"
                   >
                     {allPicked ? 'desmarcar' : 'marcar tudo'}
                   </button>
@@ -163,7 +167,7 @@ export default function ImportDay({ open, date, onClose, onImported }) {
                         >
                           <span
                             className={`grid h-6 w-6 shrink-0 place-items-center rounded-md border-2 transition
-                              ${on ? 'animate-pop border-leaf-500 bg-leaf-500 text-white' : 'border-line'}`}
+                              ${on ? 'animate-pop border-brand-500 bg-brand-500 text-on-brand' : 'border-line'}`}
                           >
                             {on && <Check size={14} strokeWidth={3} />}
                           </span>
@@ -172,7 +176,7 @@ export default function ImportDay({ open, date, onClose, onImported }) {
                               {e.name}
                             </span>
                             <span className="tnum block text-sm text-mute">
-                              {qty(e.quantity)} {e.unit === 'un' ? 'un' : e.unit}
+                              {amountText(e)}
                             </span>
                           </span>
                           <span

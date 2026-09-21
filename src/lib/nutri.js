@@ -49,15 +49,67 @@ export const parseNum = (v) => {
 
 /* Refeições -------------------------------------------------------------- */
 
+// Cada refeição tem sua cor. As classes ficam escritas por extenso
+// porque o Tailwind só gera o CSS de classes que encontra literalmente no código.
 export const MEALS = [
-  { id: 'cafe', label: 'Café da manhã' },
-  { id: 'almoco', label: 'Almoço' },
-  { id: 'lanche', label: 'Lanche' },
-  { id: 'jantar', label: 'Jantar' },
-  { id: 'ceia', label: 'Ceia' },
+  {
+    id: 'cafe',
+    label: 'Café da manhã',
+    short: 'Café',
+    dot: 'bg-meal-cafe',
+    text: 'text-meal-cafe',
+    soft: 'bg-meal-cafe/15',
+    ring: 'border-meal-cafe',
+  },
+  {
+    id: 'almoco',
+    label: 'Almoço',
+    short: 'Almoço',
+    dot: 'bg-meal-almoco',
+    text: 'text-meal-almoco',
+    soft: 'bg-meal-almoco/15',
+    ring: 'border-meal-almoco',
+  },
+  {
+    id: 'lanche',
+    label: 'Lanche',
+    short: 'Lanche',
+    dot: 'bg-meal-lanche',
+    text: 'text-meal-lanche',
+    soft: 'bg-meal-lanche/15',
+    ring: 'border-meal-lanche',
+  },
+  {
+    id: 'jantar',
+    label: 'Jantar',
+    short: 'Jantar',
+    dot: 'bg-meal-jantar',
+    text: 'text-meal-jantar',
+    soft: 'bg-meal-jantar/15',
+    ring: 'border-meal-jantar',
+  },
+  {
+    id: 'ceia',
+    label: 'Ceia',
+    short: 'Ceia',
+    dot: 'bg-meal-ceia',
+    text: 'text-meal-ceia',
+    soft: 'bg-meal-ceia/15',
+    ring: 'border-meal-ceia',
+  },
 ];
 
+export const mealOf = (id) => MEALS.find((m) => m.id === id) || MEALS[1];
+
 export const mealLabel = (id) => MEALS.find((m) => m.id === id)?.label || 'Refeição';
+
+const unitText = (u) => (u === 'un' ? 'un' : u);
+
+// Texto de quantidade de um registro: "3× ovo · 150 g" quando veio por unidade.
+export function amountText(e) {
+  const base = `${qty(e.quantity)} ${unitText(e.unit)}`;
+  return e.portions ? `${qty(e.portions)}× ${e.portionLabel || 'unidade'} · ${base}` : base;
+}
 
 // Sugere a refeição pelo horário, para o botão de adicionar já vir certo.
 export function mealNow() {
@@ -129,4 +181,19 @@ export const ageFrom = (birthYear) =>
 export function bmi(weightKg, heightCm) {
   if (!weightKg || !heightCm) return null;
   return weightKg / (heightCm / 100) ** 2;
+}
+
+/**
+ * Plural simples para medidas caseiras: ovo → ovos, colher de sopa → colheres de sopa.
+ * Palavras em "ão" (pão → pães) são irregulares demais e ficam como estão.
+ */
+export function plural(word, n) {
+  if (!word || n <= 1) return word;
+  const [first, ...rest] = word.split(' ');
+  let p = first;
+  if (/ão$/i.test(first)) p = first;
+  else if (/[aeiouáéíóúâêô]$/i.test(first)) p = first + 's';
+  else if (/[rz]$/i.test(first)) p = first + 'es';
+  else if (/m$/i.test(first)) p = first.slice(0, -1) + 'ns';
+  return [p, ...rest].join(' ');
 }

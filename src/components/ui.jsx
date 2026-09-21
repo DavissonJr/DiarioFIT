@@ -6,8 +6,8 @@ import { n0, n1 } from '../lib/nutri';
 /* Botão ------------------------------------------------------------------ */
 
 const VARIANTS = {
-  primary: 'bg-leaf-500 text-white hover:bg-leaf-600 active:bg-leaf-600 shadow-card',
-  soft: 'bg-leaf-50 text-leaf-600 hover:bg-leaf-100',
+  primary: 'bg-brand-500 text-on-brand hover:bg-brand-600 active:bg-brand-600 shadow-card',
+  soft: 'bg-brand-50 text-brand-600 hover:bg-brand-100',
   outline: 'border border-line text-ink hover:bg-canvas',
   ghost: 'text-mute hover:bg-canvas hover:text-ink',
   danger: 'bg-prot/10 text-prot hover:bg-prot/15',
@@ -67,7 +67,7 @@ export function Sheet({ open, onClose, title, subtitle, children, footer }) {
       aria-modal="true"
       aria-label={title}
     >
-      <div className="absolute inset-0 bg-ink/40" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/45" onClick={onClose} />
       <div
         className="relative flex max-h-[92dvh] w-full flex-col animate-rise bg-surface
                    rounded-t-[28px] shadow-lift sm:max-w-lg sm:rounded-[28px]"
@@ -131,23 +131,23 @@ export function Segmented({ options, value, onChange, className = '' }) {
 /* Barra do dia ----------------------------------------------------------- */
 /* Uma única barra dividida pelas refeições: quanto comeu e de onde veio. */
 
-const SEGMENT_TONES = ['bg-leaf-400', 'bg-leaf-600', 'bg-leaf-500', 'bg-leaf-700', 'bg-leaf-400'];
-
 export function DayBar({ segments, total, target }) {
   const scale = Math.max(target, total, 1);
   const over = total > target;
 
   return (
     <div className="relative">
-      <div className="flex h-3.5 gap-[3px] overflow-hidden rounded-full bg-leaf-50">
-        {segments.map((s, i) => (
-          <div
-            key={s.id}
-            className={`${SEGMENT_TONES[i % SEGMENT_TONES.length]} first:rounded-l-full transition-[width] duration-500`}
-            style={{ width: `${(s.kcal / scale) * 100}%` }}
-            title={`${s.label}: ${n0(s.kcal)} kcal`}
-          />
-        ))}
+      <div className="flex h-3.5 gap-[3px] overflow-hidden rounded-full bg-brand-50">
+        {segments
+          .filter((s) => s.kcal > 0)
+          .map((s) => (
+            <div
+              key={s.id}
+              className={`${s.color} first:rounded-l-full transition-[width] duration-500`}
+              style={{ width: `${(s.kcal / scale) * 100}%` }}
+              title={`${s.label}: ${n0(s.kcal)} kcal`}
+            />
+          ))}
       </div>
       {over && (
         <div
@@ -155,6 +155,20 @@ export function DayBar({ segments, total, target }) {
           style={{ left: `${(target / scale) * 100}%` }}
           title="Sua meta"
         />
+      )}
+
+      {segments.some((s) => s.kcal > 0) && (
+        <ul className="mt-2.5 flex flex-wrap gap-x-3.5 gap-y-1 text-xs text-mute">
+          {segments
+            .filter((s) => s.kcal > 0)
+            .map((s) => (
+              <li key={s.id} className="flex items-center gap-1.5">
+                <span className={`h-2 w-2 rounded-full ${s.color}`} />
+                {s.short}
+                <span className="tnum font-semibold text-ink">{n0(s.kcal)}</span>
+              </li>
+            ))}
+        </ul>
       )}
     </div>
   );
@@ -187,7 +201,7 @@ export function Empty({ icon: Icon, title, children, action }) {
   return (
     <div className="flex flex-col items-center px-6 py-10 text-center">
       {Icon && (
-        <div className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-leaf-50 text-leaf-500">
+        <div className="mb-3 grid h-14 w-14 place-items-center rounded-full bg-brand-50 text-brand-500">
           <Icon size={24} />
         </div>
       )}
@@ -256,7 +270,7 @@ export function Toaster() {
           key={t.id}
           role="status"
           className={`animate-rise flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium shadow-lift
-            ${t.tone === 'error' ? 'bg-prot text-white' : 'bg-ink text-white'}`}
+            ${t.tone === 'error' ? 'bg-prot text-white' : 'bg-ink text-canvas'}`}
         >
           {t.tone === 'error' ? <AlertCircle size={16} /> : <Check size={16} />}
           {t.message}

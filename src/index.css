@@ -2,6 +2,109 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------- temas
+   Canais RGB separados por espaço, para o Tailwind aplicar opacidade.
+   O tema ativo é escolhido por data-theme no <html> (ver src/lib/theme.js). */
+
+:root,
+[data-theme='verde'] {
+  --canvas: 239 242 237;
+  --surface: 255 255 255;
+  --ink: 22 34 28;
+  --mute: 97 112 106;
+  --line: 221 228 220;
+  --shadow: 22 34 28;
+  --on-brand: 255 255 255;
+  --brand-50: 234 243 237;
+  --brand-100: 211 231 219;
+  --brand-200: 169 205 184;
+  --brand-400: 62 138 99;
+  --brand-500: 31 107 71;
+  --brand-600: 24 87 58;
+  --brand-700: 18 65 43;
+}
+
+[data-theme='oceano'] {
+  --canvas: 236 241 247;
+  --surface: 255 255 255;
+  --ink: 19 31 48;
+  --mute: 92 108 128;
+  --line: 218 226 236;
+  --shadow: 19 31 48;
+  --on-brand: 255 255 255;
+  --brand-50: 232 240 251;
+  --brand-100: 207 224 247;
+  --brand-200: 158 192 237;
+  --brand-400: 63 123 203;
+  --brand-500: 36 97 181;
+  --brand-600: 28 79 148;
+  --brand-700: 21 59 111;
+}
+
+[data-theme='rosa'] {
+  --canvas: 249 240 243;
+  --surface: 255 255 255;
+  --ink: 46 22 34;
+  --mute: 127 97 110;
+  --line: 239 221 228;
+  --shadow: 46 22 34;
+  --on-brand: 255 255 255;
+  --brand-50: 252 234 241;
+  --brand-100: 248 211 226;
+  --brand-200: 239 166 195;
+  --brand-400: 213 91 140;
+  --brand-500: 190 60 113;
+  --brand-600: 160 46 94;
+  --brand-700: 120 33 70;
+}
+
+[data-theme='escuro'] {
+  color-scheme: dark;
+  --canvas: 16 21 19;
+  --surface: 26 33 30;
+  --ink: 232 238 234;
+  --mute: 148 162 155;
+  --line: 44 55 50;
+  --shadow: 0 0 0;
+  --on-brand: 10 28 19;
+  --brand-50: 29 46 38;
+  --brand-100: 37 61 49;
+  --brand-200: 62 108 84;
+  --brand-400: 76 158 116;
+  --brand-500: 94 186 138;
+  --brand-600: 120 202 158;
+  --brand-700: 170 225 194;
+}
+
+/* Macros e refeições: mesmos tons nos temas claros, mais luminosos no escuro. */
+:root {
+  --prot: 192 85 63;
+  --carb: 207 150 44;
+  --fat: 110 127 184;
+  --fiber: 122 140 78;
+  --water: 62 134 160;
+
+  --meal-cafe: 226 138 52;
+  --meal-almoco: 38 150 110;
+  --meal-lanche: 212 86 134;
+  --meal-jantar: 86 104 206;
+  --meal-ceia: 146 104 196;
+}
+
+[data-theme='escuro'] {
+  --prot: 230 124 100;
+  --carb: 234 186 88;
+  --fat: 144 160 218;
+  --fiber: 160 180 106;
+  --water: 98 172 198;
+
+  --meal-cafe: 240 165 92;
+  --meal-almoco: 80 190 148;
+  --meal-lanche: 234 124 166;
+  --meal-jantar: 128 144 234;
+  --meal-ceia: 178 142 226;
+}
+
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
@@ -23,7 +126,7 @@
   }
 
   :focus-visible {
-    @apply outline-none ring-2 ring-leaf-500 ring-offset-2 ring-offset-canvas rounded-lg;
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2 ring-offset-canvas rounded-lg;
   }
 
   /* Tira as setinhas dos campos numéricos. */
@@ -44,8 +147,8 @@
 
   .field {
     @apply w-full rounded-2xl border border-line bg-surface px-4 py-3 text-ink
-           placeholder:text-mute/60 focus:border-leaf-500 focus:outline-none
-           focus:ring-2 focus:ring-leaf-100;
+           placeholder:text-mute/60 focus:border-brand-500 focus:outline-none
+           focus:ring-2 focus:ring-brand-100;
   }
 
   .tnum {

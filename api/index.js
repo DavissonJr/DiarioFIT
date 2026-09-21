@@ -190,6 +190,8 @@ const foodOut = (f) => ({
   carbs: Number(f.carbs),
   fat: Number(f.fat),
   fiber: Number(f.fiber),
+  portionQty: f.portion_qty === null || f.portion_qty === undefined ? null : Number(f.portion_qty),
+  portionLabel: f.portion_label || null,
   favorite: f.favorite,
 });
 
@@ -222,12 +224,63 @@ r.get(
   })
 );
 
+// O que a pessoa costuma comer em cada refeição, com a quantidade de costume.
+// Conta os últimos 60 dias e só sugere o que apareceu pelo menos duas vezes.
+r.get(
+  '/foods/suggestions',
+  auth,
+  go(async (req, res) => {
+    const meal = MEALS.includes(req.query.meal) ? req.query.meal : null;
+    if (!meal) return res.status(400).json({ error: 'Refeição inválida.' });
+    const since = localDate(Date.now() - 60 * 86400000);
+
+    const rows = await sql`
+      select f.*, t.uses, q.quantity as usual_qty, q.portions as usual_portions
+      from (
+        select food_id, count(*)::int as uses, max(date) as last
+        from entries
+        where user_id = ${req.uid} and meal = ${meal} and food_id is not null and date >= ${since}
+        group by food_id
+      ) t
+      join foods f on f.id = t.food_id and f.user_id = ${req.uid}
+      join lateral (
+        select quantity, portions
+        from entries
+        where user_id = ${req.uid} and meal = ${meal} and food_id = t.food_id and date >= ${since}
+        group by quantity, portions
+        order by count(*) desc, max(date) desc
+        limit 1
+      ) q on true
+      where t.uses >= 2
+      order by t.uses desc, t.last desc
+      limit 6`;
+
+    res.json({
+      suggestions: rows.map((r) => ({
+        food: foodOut(r),
+        uses: r.uses,
+        quantity: Number(r.usual_qty),
+        portions: r.usual_portions === null ? null : Number(r.usual_portions),
+      })),
+    });
+  })
+);
+
 function readFood(body) {
   const name = String(body?.name || '').trim();
   if (!name) return { error: 'Dê um nome ao alimento.' };
   const baseQty = num(body?.baseQty, 100);
   if (baseQty <= 0) return { error: 'A medida base precisa ser maior que zero.' };
   const unit = ['g', 'ml', 'un'].includes(body?.unit) ? body.unit : 'g';
+
+  // Medida caseira só faz sentido para alimentos medidos em g ou ml.
+  const portionQty = unit === 'un' ? null : num(body?.portionQty, null);
+  if (portionQty !== null && portionQty <= 0)
+    return { error: 'A medida caseira precisa ser maior que zero.' };
+  const portionLabel = portionQty
+    ? String(body?.portionLabel || '').trim().slice(0, 24) || 'unidade'
+    : null;
+
   return {
     data: {
       name,
@@ -239,6 +292,8 @@ function readFood(body) {
       carbs: Math.max(0, num(body?.carbs)),
       fat: Math.max(0, num(body?.fat)),
       fiber: Math.max(0, num(body?.fiber)),
+      portionQty,
+      portionLabel,
       favorite: !!body?.favorite,
     },
   };
@@ -251,9 +306,11 @@ r.post(
     const { data, error } = readFood(req.body);
     if (error) return res.status(400).json({ error });
     const [f] = await sql`
-      insert into foods (user_id, name, brand, base_qty, unit, kcal, protein, carbs, fat, fiber, favorite)
+      insert into foods (user_id, name, brand, base_qty, unit, kcal, protein, carbs, fat, fiber,
+                         portion_qty, portion_label, favorite)
       values (${req.uid}, ${data.name}, ${data.brand}, ${data.baseQty}, ${data.unit},
-              ${data.kcal}, ${data.protein}, ${data.carbs}, ${data.fat}, ${data.fiber}, ${data.favorite})
+              ${data.kcal}, ${data.protein}, ${data.carbs}, ${data.fat}, ${data.fiber},
+              ${data.portionQty}, ${data.portionLabel}, ${data.favorite})
       returning *`;
     res.status(201).json({ food: foodOut(f) });
   })
@@ -268,7 +325,8 @@ r.put(
     const [f] = await sql`
       update foods set name = ${data.name}, brand = ${data.brand}, base_qty = ${data.baseQty},
         unit = ${data.unit}, kcal = ${data.kcal}, protein = ${data.protein}, carbs = ${data.carbs},
-        fat = ${data.fat}, fiber = ${data.fiber}, favorite = ${data.favorite}
+        fat = ${data.fat}, fiber = ${data.fiber}, portion_qty = ${data.portionQty},
+        portion_label = ${data.portionLabel}, favorite = ${data.favorite}
       where id = ${Number(req.params.id)} and user_id = ${req.uid}
       returning *`;
     if (!f) return res.status(404).json({ error: 'Alimento não encontrado.' });
@@ -307,8 +365,8 @@ r.get(
     const dow = weekdayOf(date);
 
     const [entries, habits, done, water, weight, note] = await Promise.all([
-      sql`select id, meal, quantity, name, unit, kcal::float8, protein::float8,
-                 carbs::float8, fat::float8, fiber::float8, food_id
+      sql`select id, meal, quantity, portions, portion_label, name, unit, kcal::float8,
+                 protein::float8, carbs::float8, fat::float8, fiber::float8, food_id
           from entries where user_id = ${req.uid} and date = ${date} order by id`,
       sql`select * from habits where user_id = ${req.uid} and archived = false order by position, id`,
       sql`select habit_id from habit_logs where user_id = ${req.uid} and date = ${date}`,
@@ -336,6 +394,8 @@ r.get(
         foodId: e.food_id,
         meal: e.meal,
         quantity: Number(e.quantity),
+        portions: e.portions === null ? null : Number(e.portions),
+        portionLabel: e.portion_label,
         name: e.name,
         unit: e.unit,
         kcal: round(e.kcal, 0),
@@ -361,23 +421,45 @@ r.get(
   })
 );
 
+/**
+ * Decide a quantidade final de um registro.
+ * Por unidade: quantidade = unidades × medida caseira, calculada aqui, nunca pelo cliente.
+ * Por peso/volume: usa a quantidade informada e limpa as unidades.
+ * `perPortion` é o tamanho de uma medida caseira; `label`, o nome dela.
+ */
+function resolveAmount(body, perPortion, label) {
+  const portions = num(body?.portions, null);
+  if (portions !== null) {
+    if (portions <= 0) return { error: 'Informe quantas unidades.' };
+    if (!perPortion) return { error: 'Esse alimento não tem medida caseira cadastrada.' };
+    return { quantity: portions * perPortion, portions, label };
+  }
+  const quantity = num(body?.quantity);
+  if (quantity <= 0) return { error: 'Informe a quantidade.' };
+  return { quantity, portions: null, label: null };
+}
+
 r.post(
   '/entries',
   auth,
   go(async (req, res) => {
     const date = isDate(req.body?.date) ? req.body.date : today();
     const meal = MEALS.includes(req.body?.meal) ? req.body.meal : 'almoco';
-    const quantity = num(req.body?.quantity);
-    if (quantity <= 0) return res.status(400).json({ error: 'Informe a quantidade.' });
 
     const [food] = await sql`
       select * from foods where id = ${Number(req.body?.foodId)} and user_id = ${req.uid}`;
     if (!food) return res.status(404).json({ error: 'Alimento não encontrado.' });
 
-    const f = quantity / Number(food.base_qty);
+    const per = food.portion_qty === null ? null : Number(food.portion_qty);
+    const amount = resolveAmount(req.body, per, food.portion_label);
+    if (amount.error) return res.status(400).json({ error: amount.error });
+
+    const f = amount.quantity / Number(food.base_qty);
     const [e] = await sql`
-      insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber)
-      values (${req.uid}, ${food.id}, ${date}, ${meal}, ${quantity}, ${food.name}, ${food.unit},
+      insert into entries (user_id, food_id, date, meal, quantity, portions, portion_label,
+                           name, unit, kcal, protein, carbs, fat, fiber)
+      values (${req.uid}, ${food.id}, ${date}, ${meal}, ${amount.quantity}, ${amount.portions},
+              ${amount.label}, ${food.name}, ${food.unit},
               ${Number(food.kcal) * f}, ${Number(food.protein) * f},
               ${Number(food.carbs) * f}, ${Number(food.fat) * f}, ${Number(food.fiber) * f})
       returning id`;
@@ -389,8 +471,6 @@ r.put(
   '/entries/:id',
   auth,
   go(async (req, res) => {
-    const quantity = num(req.body?.quantity);
-    if (quantity <= 0) return res.status(400).json({ error: 'Informe a quantidade.' });
     const [entry] = await sql`
       select * from entries where id = ${Number(req.params.id)} and user_id = ${req.uid}`;
     if (!entry) return res.status(404).json({ error: 'Registro não encontrado.' });
@@ -416,10 +496,21 @@ r.put(
           fat: Number(entry.fat),
           fiber: Number(entry.fiber),
         };
-    const f = quantity / base.per;
+    // Medida caseira: a do alimento atual; se ele sumiu, a que o próprio registro guardou.
+    const per =
+      food && food.portion_qty !== null
+        ? Number(food.portion_qty)
+        : entry.portions
+          ? Number(entry.quantity) / Number(entry.portions)
+          : null;
+    const amount = resolveAmount(req.body, per, food?.portion_label ?? entry.portion_label);
+    if (amount.error) return res.status(400).json({ error: amount.error });
+
+    const f = amount.quantity / base.per;
     const meal = MEALS.includes(req.body?.meal) ? req.body.meal : entry.meal;
 
-    await sql`update entries set quantity = ${quantity}, meal = ${meal},
+    await sql`update entries set quantity = ${amount.quantity}, meal = ${meal},
+        portions = ${amount.portions}, portion_label = ${amount.label},
         kcal = ${base.kcal * f}, protein = ${base.protein * f},
         carbs = ${base.carbs * f}, fat = ${base.fat * f}, fiber = ${base.fiber * f}
       where id = ${entry.id}`;
@@ -451,8 +542,10 @@ r.post(
     if (ids) {
       if (ids.length === 0) return res.status(400).json({ error: 'Escolha ao menos um item.' });
       const rows = await sql`
-        insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber)
-        select user_id, food_id, ${to}, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber
+        insert into entries (user_id, food_id, date, meal, quantity, portions, portion_label,
+                             name, unit, kcal, protein, carbs, fat, fiber)
+        select user_id, food_id, ${to}, meal, quantity, portions, portion_label,
+               name, unit, kcal, protein, carbs, fat, fiber
         from entries where user_id = ${req.uid} and id = any(${ids})
         returning id`;
       return res.json({ copied: rows.length });
@@ -461,8 +554,10 @@ r.post(
     const from = isDate(req.body?.from) ? req.body.from : null;
     if (!from) return res.status(400).json({ error: 'Data de origem inválida.' });
     const rows = await sql`
-      insert into entries (user_id, food_id, date, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber)
-      select user_id, food_id, ${to}, meal, quantity, name, unit, kcal, protein, carbs, fat, fiber
+      insert into entries (user_id, food_id, date, meal, quantity, portions, portion_label,
+                           name, unit, kcal, protein, carbs, fat, fiber)
+      select user_id, food_id, ${to}, meal, quantity, portions, portion_label,
+             name, unit, kcal, protein, carbs, fat, fiber
       from entries where user_id = ${req.uid} and date = ${from}
       returning id`;
     res.json({ copied: rows.length });

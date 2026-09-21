@@ -113,7 +113,7 @@ export default function Foods() {
                     <span className="block truncate font-medium">{f.name}</span>
                     <span className="block truncate text-sm text-mute tnum">
                       {f.brand ? `${f.brand} · ` : ''}
-                      {n1(f.protein)} P · {n1(f.carbs)} C · {n1(f.fat)} G
+                      {n1(f.carbs)} C · {n1(f.protein)} P · {n1(f.fat)} G
                     </span>
                   </span>
                   <span className="shrink-0 text-right">

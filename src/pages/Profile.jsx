@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, LogOut, Calculator, Pencil, KeyRound } from 'lucide-react';
+import { Plus, LogOut, Calculator, Pencil, KeyRound, Check } from 'lucide-react';
+import { THEMES, savedTheme, setTheme } from '../lib/theme';
 import { api } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import {
@@ -126,8 +127,8 @@ export default function Profile() {
         <div className="space-y-3">
           {targetField('kcal', 'Calorias', 'kcal')}
           <div className="grid grid-cols-3 gap-3">
-            {targetField('protein', 'Proteína', 'g')}
             {targetField('carbs', 'Carboidrato', 'g')}
+            {targetField('protein', 'Proteína', 'g')}
             {targetField('fat', 'Gordura', 'g')}
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -203,6 +204,8 @@ export default function Profile() {
       </section>
 
       <HabitsCard />
+
+      <ThemeCard />
 
       {/* Conta */}
       <section className="card p-5">
@@ -323,19 +326,19 @@ function CalcSheet({ open, onClose, profile, onApply }) {
           </p>
         ) : (
           <div className="space-y-3">
-            <div className="rounded-2xl bg-leaf-50 p-4">
-              <p className="text-sm text-leaf-600">
+            <div className="rounded-2xl bg-brand-50 p-4">
+              <p className="text-sm text-brand-600">
                 Seu gasto estimado é de{' '}
                 <span className="tnum font-semibold">{n0(result.maintenance)} kcal</span> por dia.
               </p>
-              <p className="mt-2 font-display text-3xl font-semibold tnum text-leaf-700">
+              <p className="mt-2 font-display text-3xl font-semibold tnum text-brand-700">
                 {n0(result.kcal)} <span className="text-base font-medium">kcal por dia</span>
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-center sm:grid-cols-4">
-              <Macro label="Proteína" value={result.protein} tone="text-prot" />
               <Macro label="Carboidrato" value={result.carbs} tone="text-carb" />
+              <Macro label="Proteína" value={result.protein} tone="text-prot" />
               <Macro label="Gordura" value={result.fat} tone="text-fat" />
               <Macro label="Fibra" value={result.fiber} tone="text-fiber" />
             </div>
@@ -528,7 +531,7 @@ function HabitSheet({ open, habit, onClose, onSaved }) {
                 key={d.id}
                 onClick={() => toggleDay(d.id)}
                 className={`h-11 flex-1 rounded-xl font-semibold transition active:scale-95 ${
-                  weekdays.includes(d.id) ? 'bg-leaf-500 text-white' : 'bg-canvas text-mute'
+                  weekdays.includes(d.id) ? 'bg-brand-500 text-on-brand' : 'bg-canvas text-mute'
                 }`}
                 aria-pressed={weekdays.includes(d.id)}
               >
@@ -607,5 +610,75 @@ function PasswordSheet({ open, onClose }) {
         <ErrorNote>{error}</ErrorNote>
       </div>
     </Sheet>
+  );
+}
+
+/* Aparência -------------------------------------------------------------- */
+
+function ThemeCard() {
+  const [atual, setAtual] = useState(savedTheme());
+
+  function escolher(id) {
+    setTheme(id);
+    setAtual(id);
+  }
+
+  return (
+    <section className="card p-5">
+      <h2 className="font-display text-lg font-semibold">Aparência</h2>
+      <p className="mt-0.5 text-sm text-mute">Vale só para este aparelho.</p>
+
+      <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
+        {THEMES.map((t) => {
+          const on = atual === t.id;
+          return (
+            <button
+              key={t.id}
+              onClick={() => escolher(t.id)}
+              aria-pressed={on}
+              className="group flex flex-col items-center gap-2"
+            >
+              <span
+                className={`relative block h-16 w-full overflow-hidden rounded-2xl border-2 transition
+                  ${on ? 'border-brand-500' : 'border-line group-hover:border-brand-200'}`}
+                style={{ background: t.canvas }}
+              >
+                {t.id === 'auto' && (
+                  // Metade clara, metade escura: segue o sistema.
+                  <span
+                    className="absolute inset-0"
+                    style={{ background: 'linear-gradient(135deg, transparent 50%, #101513 50%)' }}
+                  />
+                )}
+                <span
+                  className="absolute bottom-2 left-2 right-2 top-4 rounded-lg shadow-sm"
+                  style={{
+                    background: t.id === 'auto'
+                      ? 'linear-gradient(135deg, #FFFFFF 50%, #1A211E 50%)'
+                      : t.surface,
+                  }}
+                />
+                <span
+                  className="absolute bottom-4 left-4 h-3 w-3 rounded-full"
+                  style={{ background: t.brand }}
+                />
+                <span
+                  className="absolute bottom-[18px] left-9 right-4 h-1.5 rounded-full opacity-30"
+                  style={{ background: t.id === 'escuro' ? '#E8EEEA' : '#16221C' }}
+                />
+                {on && (
+                  <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full bg-brand-500 text-on-brand">
+                    <Check size={12} strokeWidth={3} />
+                  </span>
+                )}
+              </span>
+              <span className={`text-sm ${on ? 'font-semibold text-ink' : 'text-mute'}`}>
+                {t.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }

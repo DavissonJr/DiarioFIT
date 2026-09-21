@@ -96,7 +96,7 @@ export default function Progress() {
                   >
                     <div
                       className={`w-full rounded-t-[4px] transition-[height] duration-500 ${
-                        d.kcal === 0 ? 'bg-line' : 'bg-leaf-500'
+                        d.kcal === 0 ? 'bg-line' : 'bg-brand-500'
                       }`}
                       style={{ height: `${Math.max(d.kcal === 0 ? 2 : 4, (d.kcal / maxKcal) * 100)}%` }}
                     />
@@ -178,12 +178,12 @@ export default function Progress() {
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-canvas">
                         <div
-                          className="h-full rounded-full bg-leaf-500 transition-[width] duration-500"
+                          className="h-full rounded-full bg-brand-500 transition-[width] duration-500"
                           style={{ width: `${pct}%` }}
                         />
                       </div>
                       {h.streak > 1 && (
-                        <p className="mt-1 text-xs font-semibold text-leaf-500">
+                        <p className="mt-1 text-xs font-semibold text-brand-500">
                           {h.streak} dias seguidos
                         </p>
                       )}
@@ -206,7 +206,7 @@ export default function Progress() {
 function Stat({ icon: Icon, value, unit, label }) {
   return (
     <div className="card p-4">
-      <Icon size={18} className="mb-2 text-leaf-500" />
+      <Icon size={18} className="mb-2 text-brand-500" />
       <p className="font-display text-xl font-semibold leading-none tnum">
         {value} <span className="text-sm font-medium text-mute">{unit}</span>
       </p>
@@ -235,11 +235,11 @@ function WeightChart({ points }) {
     <div>
       <svg viewBox="0 0 300 100" preserveAspectRatio="none" className="h-28 w-full" role="img"
            aria-label="Evolução do peso">
-        <polygon points={area} fill="#1F6B47" opacity="0.08" />
+        <polygon points={area} className="fill-brand-500" opacity="0.1" />
         <polyline
           points={line}
           fill="none"
-          stroke="#1F6B47"
+          className="stroke-brand-500"
           strokeWidth="2"
           strokeLinejoin="round"
           strokeLinecap="round"
