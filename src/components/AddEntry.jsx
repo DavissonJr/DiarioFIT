@@ -536,21 +536,18 @@ export default function AddEntry({
             <div>
               <p className="mb-2 text-sm font-medium text-mute">Refeição</p>
               <div className="grid grid-cols-3 gap-2">
-                {MEALS.map((meal) => {
-                  const on = mealId === meal.id;
-                  return (
-                    <button
-                      key={meal.id}
-                      onClick={() => setMealId(meal.id)}
-                      aria-pressed={on}
-                      className={`flex items-center justify-center gap-1.5 rounded-2xl border-2 px-2 py-2.5 text-sm font-semibold transition
-                        ${on ? `${meal.ring} ${meal.soft} ${meal.text}` : 'border-transparent bg-canvas text-mute'}`}
-                    >
-                      <span className={`h-2 w-2 shrink-0 rounded-full ${meal.dot}`} />
-                      {meal.short}
-                    </button>
-                  );
-                })}
+                {MEALS.map((meal) => (
+                  <button
+                    key={meal.id}
+                    onClick={() => setMealId(meal.id)}
+                    aria-pressed={mealId === meal.id}
+                    className={`rounded-2xl px-2 py-3 text-sm font-semibold transition ${
+                      mealId === meal.id ? 'bg-brand-500 text-on-brand' : 'bg-canvas text-mute'
+                    }`}
+                  >
+                    {meal.label}
+                  </button>
+                ))}
               </div>
             </div>
 

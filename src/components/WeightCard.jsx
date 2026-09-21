@@ -48,8 +48,10 @@ export default function WeightCard({ data, onChanged }) {
 
   const weights = data.weights || [];
   const last = weights[weights.length - 1];
+  const first = weights[0];
+  const change = last && first ? last.kg - first.kg : 0;
   const g = data.weightGoal;
-  const imc = last ? bmi(last.trend ?? last.kg, user.heightCm) : null;
+  const imc = last ? bmi(last.kg, user.heightCm) : null;
 
   return (
     <section className="card p-5">
@@ -58,12 +60,15 @@ export default function WeightCard({ data, onChanged }) {
           <h2 className="font-display text-lg font-semibold">Peso</h2>
           {last ? (
             <div className="mt-1">
-              <p className="tnum font-display text-3xl font-semibold leading-none">
-                {n1(last.trend ?? last.kg)} kg
+              <p className="tnum font-display text-2xl font-semibold leading-none">
+                {n1(last.kg)} kg
               </p>
-              <p className="tnum mt-1.5 text-sm text-mute">
-                tendência · última pesagem {n1(last.kg)} kg em {shortDate(last.date)}
-              </p>
+              {weights.length > 1 && (
+                <p className="tnum mt-1 text-sm text-mute">
+                  {change > 0 ? '+' : ''}
+                  {n1(change)} kg desde {shortDate(first.date)}
+                </p>
+              )}
             </div>
           ) : (
             <p className="mt-1 text-sm text-mute">Nenhum registro ainda.</p>
@@ -183,10 +188,6 @@ function Aviso({ children }) {
 /* Linha simples das pesagens. Com meta definida, a meta aparece tracejada. */
 
 function WeightChart({ points, target }) {
-  const t0 = Date.parse(points[0].date);
-  const t1 = Date.parse(points[points.length - 1].date);
-  const span = t1 - t0 || 1;
-
   const pesos = points.map((p) => p.kg);
   const min = Math.min(...pesos);
   const max = Math.max(...pesos);
@@ -196,10 +197,10 @@ function WeightChart({ points, target }) {
   const lo = lo0 - pad;
   const hi = hi0 + pad;
 
-  const x = (date) => ((Date.parse(date) - t0) / span) * 300;
+  const x = (i) => (i / Math.max(1, points.length - 1)) * 300;
   const y = (kg) => 100 - ((kg - lo) / (hi - lo)) * 100;
 
-  const linha = points.map((p) => `${x(p.date).toFixed(1)},${y(p.kg).toFixed(1)}`).join(' ');
+  const linha = points.map((p, i) => `${x(i).toFixed(1)},${y(p.kg).toFixed(1)}`).join(' ');
   const area = `0,100 ${linha} 300,100`;
 
   return (
@@ -337,7 +338,7 @@ function GoalSheet({ open, onClose, onSaved, last, goal }) {
 
   useEffect(() => {
     if (!open) return;
-    setAtual(last ? String(Math.round((last.trend ?? last.kg) * 10) / 10).replace('.', ',') : '');
+    setAtual(last ? String(last.kg).replace('.', ',') : '');
     setMexeuNoAtual(false);
     setMeta(goal ? String(goal.target).replace('.', ',') : '');
     setError('');
@@ -389,7 +390,7 @@ function GoalSheet({ open, onClose, onSaved, last, goal }) {
     >
       <div className="space-y-4 pb-2">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="Peso atual (kg)" hint={last ? 'Pela sua tendência.' : undefined}>
+          <Field label="Peso atual (kg)" hint={last ? `Última pesagem, em ${shortDate(last.date)}.` : undefined}>
             <input
               className="field tnum text-xl font-semibold"
               value={atual}
