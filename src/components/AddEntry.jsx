@@ -300,26 +300,7 @@ export default function AddEntry({
       >
         {step === 'pick' ? (
           <div className="pb-2">
-            <div className="sticky top-0 z-10 -mx-1 space-y-3 bg-surface px-1 pb-3">
-              {/* Refeição: define para onde vai e quais sugestões aparecem */}
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [scrollbar-width:none]">
-                {MEALS.map((meal) => {
-                  const on = meal.id === mealId;
-                  return (
-                    <button
-                      key={meal.id}
-                      onClick={() => setMealId(meal.id)}
-                      aria-pressed={on}
-                      className={`flex shrink-0 items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-sm font-semibold transition
-                        ${on ? `${meal.ring} ${meal.soft} ${meal.text}` : 'border-transparent bg-canvas text-mute'}`}
-                    >
-                      <span className={`h-2 w-2 rounded-full ${meal.dot}`} />
-                      {meal.short}
-                    </button>
-                  );
-                })}
-              </div>
-
+            <div className="sticky top-0 z-10 -mx-1 bg-surface px-1 pb-3">
               <div className="relative">
                 <Search
                   size={19}

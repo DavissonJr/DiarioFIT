@@ -84,13 +84,6 @@ export default function WeightCard({ data, onChanged }) {
         </p>
       )}
 
-      {weights.length > 1 && (
-        <p className="mt-2 flex items-start gap-1.5 text-xs text-mute">
-          <Info size={13} className="mt-px shrink-0" />
-          Os pontos são as pesagens; a linha é a tendência, que suaviza as oscilações de água do
-          dia a dia.
-        </p>
-      )}
 
       {g?.lowBmi && (
         <Aviso>
@@ -187,39 +180,39 @@ function Aviso({ children }) {
 }
 
 /* Gráfico ---------------------------------------------------------------- */
-/* Eixo X no tempo real (pesagens irregulares ficam no lugar certo). A linha é
-   SVG esticado; pontos e rótulos são HTML por cima, para não virarem elipses. */
+/* Linha simples das pesagens. Com meta definida, a meta aparece tracejada. */
 
 function WeightChart({ points, target }) {
   const t0 = Date.parse(points[0].date);
   const t1 = Date.parse(points[points.length - 1].date);
   const span = t1 - t0 || 1;
 
-  const valores = points.flatMap((p) => [p.kg, p.trend ?? p.kg]);
-  if (target !== null) valores.push(target);
-  const min = Math.min(...valores);
-  const max = Math.max(...valores);
-  const pad = Math.max(0.5, (max - min) * 0.15);
-  const lo = min - pad;
-  const hi = max + pad;
+  const pesos = points.map((p) => p.kg);
+  const min = Math.min(...pesos);
+  const max = Math.max(...pesos);
+  const lo0 = target !== null ? Math.min(min, target) : min;
+  const hi0 = target !== null ? Math.max(max, target) : max;
+  const pad = Math.max(0.5, (hi0 - lo0) * 0.2);
+  const lo = lo0 - pad;
+  const hi = hi0 + pad;
 
-  const x = (date) => ((Date.parse(date) - t0) / span) * 100;
+  const x = (date) => ((Date.parse(date) - t0) / span) * 300;
   const y = (kg) => 100 - ((kg - lo) / (hi - lo)) * 100;
 
-  const linha = points.map((p) => `${(x(p.date) * 3).toFixed(1)},${y(p.trend ?? p.kg).toFixed(1)}`).join(' ');
+  const linha = points.map((p) => `${x(p.date).toFixed(1)},${y(p.kg).toFixed(1)}`).join(' ');
   const area = `0,100 ${linha} 300,100`;
 
   return (
     <div>
-      <div className="relative h-36">
+      <div className="relative">
         <svg
           viewBox="0 0 300 100"
           preserveAspectRatio="none"
-          className="absolute inset-0 h-full w-full overflow-visible"
+          className="h-28 w-full"
           role="img"
           aria-label="Evolução do peso"
         >
-          <polygon points={area} className="fill-brand-500" opacity="0.08" />
+          <polygon points={area} className="fill-brand-500" opacity="0.1" />
           {target !== null && (
             <line
               x1="0"
@@ -237,34 +230,26 @@ function WeightChart({ points, target }) {
             points={linha}
             fill="none"
             className="stroke-brand-500"
-            strokeWidth="2.5"
+            strokeWidth="2"
             strokeLinejoin="round"
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
           />
         </svg>
-
-        {points.map((p) => (
-          <span
-            key={p.date}
-            className="absolute h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-brand-500 bg-surface"
-            style={{ left: `${x(p.date)}%`, top: `${y(p.kg)}%` }}
-            title={`${shortDate(p.date)}: ${n1(p.kg)} kg`}
-          />
-        ))}
-
         {target !== null && (
           <span
             className="tnum absolute right-0 -translate-y-full rounded-md bg-surface/90 px-1.5 text-[11px] font-semibold text-mute"
-            style={{ top: `${y(target)}%` }}
+            style={{ top: `${(y(target) / 100) * 7}rem` }}
           >
             meta {n1(target)}
           </span>
         )}
       </div>
-
-      <div className="tnum mt-1.5 flex justify-between text-[11px] text-mute">
+      <div className="tnum mt-1 flex justify-between text-[11px] text-mute">
         <span>{shortDate(points[0].date)}</span>
+        <span>
+          {n1(min)} – {n1(max)} kg
+        </span>
         <span>{shortDate(points[points.length - 1].date)}</span>
       </div>
     </div>
